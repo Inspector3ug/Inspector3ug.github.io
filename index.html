@@ -463,9 +463,9 @@
     // ⚠️ UPDATE THESE WITH YOUR INFO
     const GITHUB_CONFIG = {
         REPO_OWNER: 'inspector3ug',
-        REPO_NAME: 'mymoney',
+        REPO_NAME: 'money-tracker-data',      // Your data repository
         DATA_FILE: 'transactions.json',
-        GIST_ID: null // Will be stored after first save
+        TOKEN_FILE: 'config.json'             // Will store token in your repo
     };
 
     // Set default date and time
@@ -477,21 +477,26 @@
     let githubToken = null;
     let isAuthenticated = false;
 
-    // ✅ NEW: Load GIST_ID from localStorage
-    function loadGistId() {
-        GITHUB_CONFIG.GIST_ID = localStorage.getItem('moneyTrackerGistId');
-        console.log('GIST ID:', GITHUB_CONFIG.GIST_ID);
+    // ✅ SIMPLE: Load token from localStorage first
+    function loadToken() {
+        githubToken = localStorage.getItem('githubToken');
+        if (githubToken) {
+            console.log('✅ Token found in localStorage');
+            initializeWithToken(githubToken);
+        } else {
+            console.log('❌ No token found');
+            setNotConnected();
+        }
     }
 
-    // ✅ NEW: Save token to GitHub Gist (cloud storage)
-    async function saveTokenToGist(token) {
+    // ✅ NEW: Save token to your data repository (REAL cloud storage)
+    async function saveTokenToCloud(token) {
         if (!token) return false;
         
         try {
-            console.log('💾 Saving token to GitHub Gist...');
+            console.log('💾 Saving token to cloud repository...');
             
             // Test the token first
-            githubToken = token;
             const testResponse = await fetch('https://api.github.com/user', {
                 headers: {
                     'Authorization': `token ${token}`
@@ -502,138 +507,122 @@
                 throw new Error('Invalid token');
             }
 
-            const gistData = {
-                description: 'Money Tracker Token Storage',
-                public: false, // PRIVATE gist
-                files: {
-                    'token.json': {
-                        content: JSON.stringify({
-                            token: token,
-                            savedAt: new Date().toISOString(),
-                            repository: `${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`
-                        }, null, 2)
-                    }
-                }
+            // Save token to config file in your data repository
+            let sha = null;
+            try {
+                const existingFile = await githubApiCallWithToken(token, 
+                    `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.TOKEN_FILE}`
+                );
+                sha = existingFile.sha;
+                console.log('📝 Updating existing config file');
+            } catch (error) {
+                if (error.status !== 404) throw error;
+                console.log('📝 Creating new config file');
+            }
+
+            const configData = {
+                token: token,
+                savedAt: new Date().toISOString(),
+                repository: `${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`,
+                note: 'Money Tracker Configuration - Token Storage'
             };
 
-            let response;
-            if (GITHUB_CONFIG.GIST_ID) {
-                // Update existing gist
-                response = await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.GIST_ID}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(gistData)
-                });
-            } else {
-                // Create new gist
-                response = await fetch('https://api.github.com/gists', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(gistData)
-                });
-            }
+            await githubApiCallWithToken(token,
+                `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.TOKEN_FILE}`,
+                'PUT',
+                {
+                    message: 'Save money tracker configuration',
+                    content: btoa(JSON.stringify(configData, null, 2)),
+                    sha: sha
+                }
+            );
 
-            if (response.ok) {
-                const gist = await response.json();
-                GITHUB_CONFIG.GIST_ID = gist.id;
-                localStorage.setItem('moneyTrackerGistId', gist.id);
-                console.log('✅ Token saved to Gist:', gist.id);
-                return true;
-            } else {
-                throw new Error(`Gist API error: ${response.status}`);
-            }
+            console.log('✅ Token saved to cloud repository!');
+            return true;
         } catch (error) {
-            console.error('❌ Error saving token to Gist:', error);
+            console.error('❌ Error saving token to cloud:', error);
             return false;
         }
     }
 
-    // ✅ NEW: Load token from GitHub Gist
-    async function loadTokenFromGist() {
-        if (!GITHUB_CONFIG.GIST_ID) {
-            console.log('No Gist ID found');
-            return null;
-        }
-
+    // ✅ NEW: Load token from cloud repository
+    async function loadTokenFromCloud() {
         try {
-            console.log('📥 Loading token from Gist...');
+            console.log('📥 Attempting to load token from cloud...');
             
-            // Try to get the gist without authentication first (if it's accessible)
-            const response = await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.GIST_ID}`);
+            // Try to load the config file directly from GitHub (no auth needed for public access)
+            const response = await fetch(
+                `https://raw.githubusercontent.com/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/main/${GITHUB_CONFIG.TOKEN_FILE}`
+            );
             
             if (response.ok) {
-                const gist = await response.json();
-                const tokenData = JSON.parse(gist.files['token.json'].content);
-                console.log('✅ Token loaded from Gist');
-                return tokenData.token;
+                const configData = await response.json();
+                console.log('✅ Token loaded from cloud!');
+                return configData.token;
             } else {
-                console.log('Gist requires authentication or not found');
+                console.log('❌ No config file found in cloud');
                 return null;
             }
         } catch (error) {
-            console.log('Error loading from Gist:', error);
+            console.log('❌ Error loading from cloud:', error);
             return null;
         }
     }
 
-    // ✅ NEW: Enhanced token loading that tries Gist first
-    async function loadToken() {
-        console.log('🔄 Loading token...');
+    // ✅ NEW: Auto-load from cloud on startup
+    async function initializeApp() {
+        console.log('🚀 Initializing app...');
         
-        // Try localStorage first (for backward compatibility)
+        // Try localStorage first (fast)
         githubToken = localStorage.getItem('githubToken');
         if (githubToken) {
-            console.log('✅ Token found in localStorage');
+            console.log('✅ Using localStorage token');
             await initializeWithToken(githubToken);
             return;
         }
 
-        // Try to load Gist ID and then token from Gist
-        loadGistId();
-        if (GITHUB_CONFIG.GIST_ID) {
-            const gistToken = await loadTokenFromGist();
-            if (gistToken) {
-                console.log('✅ Token loaded from Gist');
-                githubToken = gistToken;
-                await initializeWithToken(githubToken);
-                return;
-            }
+        // Try cloud storage
+        console.log('☁️ Checking cloud storage...');
+        const cloudToken = await loadTokenFromCloud();
+        if (cloudToken) {
+            console.log('✅ Using cloud token');
+            githubToken = cloudToken;
+            localStorage.setItem('githubToken', cloudToken); // Cache it
+            await initializeWithToken(cloudToken);
+            return;
         }
 
-        // No token found
+        // No token found anywhere
         console.log('❌ No token found anywhere');
-        isAuthenticated = false;
-        authStatus.textContent = 'Not connected to GitHub';
-        authStatus.className = 'auth-status not-authenticated';
-        githubAuthBtn.textContent = 'Connect to GitHub';
+        setNotConnected();
+        
+        // Load local transactions if any
+        transactions = JSON.parse(localStorage.getItem('moneyTrackerTransactions')) || [];
+        renderTransactions();
+        updateSummary();
     }
 
-    // ✅ NEW: Initialize app with a token
+    // Initialize with token
     async function initializeWithToken(token) {
         githubToken = token;
         isAuthenticated = true;
-        authStatus.textContent = 'Checking token...';
+        authStatus.textContent = 'Checking connection...';
         authStatus.className = 'auth-status authenticated';
         githubAuthBtn.textContent = 'Update Token';
 
         const valid = await testToken();
         if (valid) {
-            console.log('✅ Token is valid!');
-            authStatus.textContent = 'Connected to GitHub';
+            console.log('✅ Token valid!');
+            authStatus.textContent = 'Connected to GitHub ☁️';
             await checkRepositoryAccess();
+            updateCloudStatus(true);
         } else {
-            console.log('❌ Token is invalid');
+            console.log('❌ Token invalid');
             await handleInvalidToken();
         }
     }
 
-    // Test token validity
+    // Test token
     async function testToken() {
         try {
             const response = await fetch('https://api.github.com/user', {
@@ -650,71 +639,30 @@
     // Handle invalid token
     async function handleInvalidToken() {
         localStorage.removeItem('githubToken');
-        localStorage.removeItem('moneyTrackerGistId');
         githubToken = null;
         isAuthenticated = false;
-        GITHUB_CONFIG.GIST_ID = null;
         authStatus.textContent = 'Token expired - please reconnect';
         authStatus.className = 'auth-status not-authenticated';
         githubAuthBtn.textContent = 'Connect to GitHub';
+        updateCloudStatus(false);
     }
 
-    // Check repository access
-    async function checkRepositoryAccess() {
-        if (!isAuthenticated) return;
-        
-        try {
-            repoStatus.innerHTML = '<span class="loading"></span>Checking repository access...';
-            await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
-            
-            repoStatus.textContent = `✓ Connected to: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
-            repoStatus.className = 'auth-status authenticated';
-            
-            await loadTransactionsFromGitHub();
-        } catch (error) {
-            repoStatus.textContent = '✗ Error accessing repository';
-            repoStatus.className = 'auth-status not-authenticated';
-        }
+    // Set not connected state
+    function setNotConnected() {
+        isAuthenticated = false;
+        authStatus.textContent = 'Not connected to GitHub';
+        authStatus.className = 'auth-status not-authenticated';
+        githubAuthBtn.textContent = 'Connect to GitHub';
+        updateCloudStatus(false);
     }
 
-    // GitHub authentication - saves to Gist
-    async function authenticateWithGitHub() {
-        const token = prompt(`🔐 GitHub Personal Access Token Required
-
-This token will be stored securely in a PRIVATE GitHub Gist and will work across all your devices.
-
-Enter your token with "repo" and "gist" permissions:
-
-Need a token?
-1. Go to: https://github.com/settings/tokens
-2. Click "Generate new token (classic)" 
-3. Select: ✅ "repo" AND ✅ "gist"
-4. Generate and paste here:`);
-
-        if (token) {
-            authStatus.innerHTML = '<span class="loading"></span>Saving token to cloud...';
-            
-            // Save to Gist (cloud storage)
-            const saved = await saveTokenToGist(token);
-            
-            if (saved) {
-                // Also save to localStorage as backup
-                localStorage.setItem('githubToken', token);
-                await initializeWithToken(token);
-                alert('✅ Token saved to cloud! It will work on all your devices.');
-            } else {
-                alert('❌ Failed to save token to cloud. Please check your token has "gist" permission.');
-            }
-        }
-    }
-
-    // GitHub API call helper
-    async function githubApiCall(endpoint, method = 'GET', body = null) {
+    // GitHub API call with specific token
+    async function githubApiCallWithToken(token, endpoint, method = 'GET', body = null) {
         const url = `https://api.github.com${endpoint}`;
         const options = {
             method,
             headers: {
-                'Authorization': `token ${githubToken}`,
+                'Authorization': `token ${token}`,
                 'Accept': 'application/vnd.github.v3+json',
                 'Content-Type': 'application/json'
             }
@@ -735,12 +683,65 @@ Need a token?
         return response.json();
     }
 
+    // Regular GitHub API call (uses current token)
+    async function githubApiCall(endpoint, method = 'GET', body = null) {
+        return githubApiCallWithToken(githubToken, endpoint, method, body);
+    }
+
+    // Check repository access
+    async function checkRepositoryAccess() {
+        if (!isAuthenticated) return;
+        
+        try {
+            repoStatus.innerHTML = '<span class="loading"></span>Checking repository...';
+            await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
+            
+            repoStatus.textContent = `✓ Connected to: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
+            repoStatus.className = 'auth-status authenticated';
+            
+            await loadTransactionsFromGitHub();
+        } catch (error) {
+            repoStatus.textContent = '✗ Error accessing repository';
+            repoStatus.className = 'auth-status not-authenticated';
+        }
+    }
+
+    // GitHub authentication - saves to cloud
+    async function authenticateWithGitHub() {
+        const token = prompt(`🔐 GitHub Personal Access Token - CLOUD STORAGE
+
+This will save your token to your repository so it works on ALL your devices.
+
+Enter token with "repo" permission:
+
+Need help?
+1. Go to: https://github.com/settings/tokens
+2. Generate token with ✅ "repo" scope
+3. Paste it here:`);
+
+        if (token) {
+            authStatus.innerHTML = '<span class="loading"></span>Saving to cloud...';
+            
+            // Save to cloud repository
+            const saved = await saveTokenToCloud(token);
+            
+            if (saved) {
+                // Also save to localStorage for fast access
+                localStorage.setItem('githubToken', token);
+                await initializeWithToken(token);
+                alert('✅ SUCCESS! Token saved to cloud.\n\nYou can now use this on any device! 📱💻🖥️');
+            } else {
+                alert('❌ Failed to save token. Please check:\n\n1. Token has "repo" permission\n2. Repository exists: ' + GITHUB_CONFIG.REPO_NAME);
+            }
+        }
+    }
+
     // Load transactions from GitHub
     async function loadTransactionsFromGitHub() {
         if (!isAuthenticated) return;
         
         try {
-            authStatus.innerHTML = '<span class="loading"></span>Loading data from GitHub...';
+            authStatus.innerHTML = '<span class="loading"></span>Loading data...';
             
             const fileData = await githubApiCall(
                 `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
@@ -752,13 +753,13 @@ Need a token?
             renderTransactions();
             updateSummary();
             
-            authStatus.textContent = 'Connected to GitHub';
+            authStatus.textContent = 'Connected to GitHub ☁️';
         } catch (error) {
             if (error.status === 404) {
                 transactions = [];
                 renderTransactions();
                 updateSummary();
-                authStatus.textContent = 'Connected to GitHub (ready for new data)';
+                authStatus.textContent = 'Connected to GitHub ☁️ (ready for data)';
             } else {
                 authStatus.textContent = 'Error loading data';
             }
@@ -773,7 +774,7 @@ Need a token?
         }
         
         try {
-            authStatus.innerHTML = '<span class="loading"></span>Saving to GitHub...';
+            authStatus.innerHTML = '<span class="loading"></span>Saving...';
             
             let sha = null;
             try {
@@ -803,24 +804,30 @@ Need a token?
                 }
             );
             
-            authStatus.textContent = 'Connected to GitHub';
+            authStatus.textContent = 'Connected to GitHub ☁️';
             return true;
         } catch (error) {
-            console.error('Error saving to GitHub:', error);
             localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
             authStatus.textContent = 'Error saving - using local storage';
             return false;
         }
     }
 
+    // Update cloud status display
+    function updateCloudStatus(connected) {
+        const cloudStatusElement = document.getElementById('cloud-status');
+        if (cloudStatusElement) {
+            cloudStatusElement.textContent = connected ? 
+                '✅ Token in Cloud - Works on all devices!' : 
+                '❌ No Cloud Token - Enter token once to enable multi-device';
+            cloudStatusElement.style.color = connected ? 'green' : 'red';
+        }
+    }
+
     // Calculate balance
     function calculateBalance() {
-        const totalIncome = transactions
-            .filter(t => t.type === 'In')
-            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-        const totalExpenses = transactions
-            .filter(t => t.type === 'Out')
-            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalIncome = transactions.filter(t => t.type === 'In').reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalExpenses = transactions.filter(t => t.type === 'Out').reduce((sum, t) => sum + parseFloat(t.cost), 0);
         return totalIncome - totalExpenses;
     }
 
@@ -842,28 +849,18 @@ Need a token?
     // Group transactions by month
     function groupTransactionsByMonth() {
         const grouped = {};
-        
         transactions.forEach(transaction => {
             const monthKey = getMonthName(transaction.date);
-            
-            if (!grouped[monthKey]) {
-                grouped[monthKey] = [];
-            }
-            
+            if (!grouped[monthKey]) grouped[monthKey] = [];
             grouped[monthKey].push(transaction);
         });
-        
         return grouped;
     }
 
     // Update summary cards
     function updateSummary() {
-        const totalIncome = transactions
-            .filter(t => t.type === 'In')
-            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-        const totalExpenses = transactions
-            .filter(t => t.type === 'Out')
-            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalIncome = transactions.filter(t => t.type === 'In').reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalExpenses = transactions.filter(t => t.type === 'Out').reduce((sum, t) => sum + parseFloat(t.cost), 0);
         const balance = totalIncome - totalExpenses;
         
         currentBalanceEl.textContent = formatCurrency(balance);
@@ -884,19 +881,12 @@ Need a token?
         const groupedTransactions = groupTransactionsByMonth();
         let html = '';
         
-        const sortedMonths = Object.keys(groupedTransactions).sort((a, b) => {
-            return new Date(b) - new Date(a);
-        });
+        const sortedMonths = Object.keys(groupedTransactions).sort((a, b) => new Date(b) - new Date(a));
         
         sortedMonths.forEach(month => {
             const monthTransactions = groupedTransactions[month];
-            
-            const monthIncome = monthTransactions
-                .filter(t => t.type === 'In')
-                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-            const monthExpenses = monthTransactions
-                .filter(t => t.type === 'Out')
-                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+            const monthIncome = monthTransactions.filter(t => t.type === 'In').reduce((sum, t) => sum + parseFloat(t.cost), 0);
+            const monthExpenses = monthTransactions.filter(t => t.type === 'Out').reduce((sum, t) => sum + parseFloat(t.cost), 0);
             const monthBalance = monthIncome - monthExpenses;
             
             html += `
@@ -962,15 +952,7 @@ Need a token?
         const type = document.getElementById('type').value;
         const cost = document.getElementById('cost').value;
         
-        const transaction = {
-            date,
-            time,
-            category,
-            description,
-            type,
-            cost: parseFloat(cost)
-        };
-        
+        const transaction = { date, time, category, description, type, cost: parseFloat(cost) };
         transactions.push(transaction);
         await saveTransactionsToGitHub();
         renderTransactions();
@@ -999,17 +981,12 @@ Need a token?
         }
         
         let csvContent = "Date,Time,Category,Description,Type,Cost\n";
-        
         transactions.forEach(transaction => {
             csvContent += `"${transaction.date}","${transaction.time}","${transaction.category}","${transaction.description || ''}","${transaction.type}",${transaction.cost}\n`;
         });
         
-        const totalIncome = transactions
-            .filter(t => t.type === 'In')
-            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-        const totalExpenses = transactions
-            .filter(t => t.type === 'Out')
-            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalIncome = transactions.filter(t => t.type === 'In').reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalExpenses = transactions.filter(t => t.type === 'Out').reduce((sum, t) => sum + parseFloat(t.cost), 0);
         const balance = totalIncome - totalExpenses;
         
         csvContent += `\nTOTAL (in a month),,,,,\n`;
@@ -1049,7 +1026,6 @@ Need a token?
                 
                 for (let j = 0; j < line.length; j++) {
                     const char = line[j];
-                    
                     if (char === '"') {
                         inQuotes = !inQuotes;
                     } else if (char === ',' && !inQuotes) {
@@ -1059,7 +1035,6 @@ Need a token?
                         currentValue += char;
                     }
                 }
-                
                 values.push(currentValue);
                 
                 if (values[0].includes('TOTAL') || !values[0]) continue;
@@ -1080,9 +1055,7 @@ Need a token?
                     t.cost === transaction.cost
                 );
                 
-                if (!exists) {
-                    importedTransactions.push(transaction);
-                }
+                if (!exists) importedTransactions.push(transaction);
             }
             
             if (importedTransactions.length > 0) {
@@ -1103,7 +1076,7 @@ Need a token?
 
     // Clear all data
     async function clearAllData() {
-        if (confirm('Are you sure you want to delete all transactions? This action cannot be undone.')) {
+        if (confirm('Are you sure you want to delete all transactions?')) {
             transactions = [];
             await saveTransactionsToGitHub();
             renderTransactions();
@@ -1118,22 +1091,15 @@ Need a token?
     clearBtn.addEventListener('click', clearAllData);
     githubAuthBtn.addEventListener('click', authenticateWithGitHub);
 
-    // Initialize
-    loadToken();
-    
-    // Load any local transactions if not authenticated
-    if (!isAuthenticated) {
-        transactions = JSON.parse(localStorage.getItem('moneyTrackerTransactions')) || [];
-        renderTransactions();
-        updateSummary();
-    }
+    // Initialize app
+    initializeApp();
 
-    // Add cloud status indicator
+    // Add cloud status display
     const cloudStatus = document.createElement('div');
-    cloudStatus.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; font-size: 12px; z-index: 1000;';
+    cloudStatus.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; font-size: 12px; z-index: 1000; max-width: 250px;';
     cloudStatus.innerHTML = `
-        <strong>Cloud Status:</strong><br>
-        <span id="cloud-status">${GITHUB_CONFIG.GIST_ID ? '✅ Token in Cloud' : '❌ No Cloud Token'}</span>
+        <strong>🌐 Multi-Device Status:</strong><br>
+        <span id="cloud-status">Checking cloud storage...</span>
     `;
     document.body.appendChild(cloudStatus);
 </script>
