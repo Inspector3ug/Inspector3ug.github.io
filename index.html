@@ -445,7 +445,7 @@
         </footer>
     </div>
 
-    <script>
+   <script>
     // DOM Elements
     const transactionForm = document.getElementById('transaction-form');
     const transactionList = document.getElementById('transaction-list');
@@ -460,14 +460,13 @@
     const authStatus = document.getElementById('auth-status');
     const repoStatus = document.getElementById('repo-status');
 
-    // ⚠️ UPDATE THESE WITH YOUR ACTUAL INFO
+    // ⚠️ UPDATE THESE WITH YOUR INFO
     const GITHUB_CONFIG = {
-        REPO_OWNER: 'inspector3ug',           // Your GitHub username
-        REPO_NAME: 'mymoney',      // Your ACTUAL repository name
-        DATA_FILE: 'transactions.json'
+        REPO_OWNER: 'inspector3ug',
+        REPO_NAME: 'money-tracker-data',
+        DATA_FILE: 'transactions.json',
+        GIST_ID: null // Will be stored after first save
     };
-
-    console.log('🔧 GitHub Config:', GITHUB_CONFIG);
 
     // Set default date and time
     document.getElementById('date').valueAsDate = new Date();
@@ -478,222 +477,240 @@
     let githubToken = null;
     let isAuthenticated = false;
 
-    // ✅ DEBUG: Enhanced token loading with detailed logging
-    function loadToken() {
-        console.log('🔄 Loading token from localStorage...');
-        githubToken = localStorage.getItem('githubToken');
+    // ✅ NEW: Load GIST_ID from localStorage
+    function loadGistId() {
+        GITHUB_CONFIG.GIST_ID = localStorage.getItem('moneyTrackerGistId');
+        console.log('GIST ID:', GITHUB_CONFIG.GIST_ID);
+    }
+
+    // ✅ NEW: Save token to GitHub Gist (cloud storage)
+    async function saveTokenToGist(token) {
+        if (!token) return false;
         
-        if (githubToken) {
-            console.log('✅ Token found in localStorage');
-            console.log('📝 Token (first 10 chars):', githubToken.substring(0, 10) + '...');
+        try {
+            console.log('💾 Saving token to GitHub Gist...');
             
-            isAuthenticated = true;
-            authStatus.textContent = 'Checking token...';
-            authStatus.className = 'auth-status authenticated';
-            githubAuthBtn.textContent = 'Update Token';
-            
-            // Test the token immediately
-            testToken().then(valid => {
-                if (valid) {
-                    console.log('✅ Token is valid!');
-                    authStatus.textContent = 'Connected to GitHub';
-                    checkRepositoryAccess();
-                } else {
-                    console.log('❌ Token is invalid or expired');
-                    localStorage.removeItem('githubToken');
-                    githubToken = null;
-                    isAuthenticated = false;
-                    authStatus.textContent = 'Token expired - please reconnect';
-                    authStatus.className = 'auth-status not-authenticated';
-                    githubAuthBtn.textContent = 'Connect to GitHub';
+            // Test the token first
+            githubToken = token;
+            const testResponse = await fetch('https://api.github.com/user', {
+                headers: {
+                    'Authorization': `token ${token}`
                 }
             });
-        } else {
-            console.log('❌ No token found in localStorage');
-            isAuthenticated = false;
-            authStatus.textContent = 'Not connected to GitHub';
-            authStatus.className = 'auth-status not-authenticated';
-            githubAuthBtn.textContent = 'Connect to GitHub';
+            
+            if (!testResponse.ok) {
+                throw new Error('Invalid token');
+            }
+
+            const gistData = {
+                description: 'Money Tracker Token Storage',
+                public: false, // PRIVATE gist
+                files: {
+                    'token.json': {
+                        content: JSON.stringify({
+                            token: token,
+                            savedAt: new Date().toISOString(),
+                            repository: `${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`
+                        }, null, 2)
+                    }
+                }
+            };
+
+            let response;
+            if (GITHUB_CONFIG.GIST_ID) {
+                // Update existing gist
+                response = await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(gistData)
+                });
+            } else {
+                // Create new gist
+                response = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(gistData)
+                });
+            }
+
+            if (response.ok) {
+                const gist = await response.json();
+                GITHUB_CONFIG.GIST_ID = gist.id;
+                localStorage.setItem('moneyTrackerGistId', gist.id);
+                console.log('✅ Token saved to Gist:', gist.id);
+                return true;
+            } else {
+                throw new Error(`Gist API error: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('❌ Error saving token to Gist:', error);
+            return false;
         }
     }
 
-    // ✅ DEBUG: Enhanced token testing
+    // ✅ NEW: Load token from GitHub Gist
+    async function loadTokenFromGist() {
+        if (!GITHUB_CONFIG.GIST_ID) {
+            console.log('No Gist ID found');
+            return null;
+        }
+
+        try {
+            console.log('📥 Loading token from Gist...');
+            
+            // Try to get the gist without authentication first (if it's accessible)
+            const response = await fetch(`https://api.github.com/gists/${GITHUB_CONFIG.GIST_ID}`);
+            
+            if (response.ok) {
+                const gist = await response.json();
+                const tokenData = JSON.parse(gist.files['token.json'].content);
+                console.log('✅ Token loaded from Gist');
+                return tokenData.token;
+            } else {
+                console.log('Gist requires authentication or not found');
+                return null;
+            }
+        } catch (error) {
+            console.log('Error loading from Gist:', error);
+            return null;
+        }
+    }
+
+    // ✅ NEW: Enhanced token loading that tries Gist first
+    async function loadToken() {
+        console.log('🔄 Loading token...');
+        
+        // Try localStorage first (for backward compatibility)
+        githubToken = localStorage.getItem('githubToken');
+        if (githubToken) {
+            console.log('✅ Token found in localStorage');
+            await initializeWithToken(githubToken);
+            return;
+        }
+
+        // Try to load Gist ID and then token from Gist
+        loadGistId();
+        if (GITHUB_CONFIG.GIST_ID) {
+            const gistToken = await loadTokenFromGist();
+            if (gistToken) {
+                console.log('✅ Token loaded from Gist');
+                githubToken = gistToken;
+                await initializeWithToken(githubToken);
+                return;
+            }
+        }
+
+        // No token found
+        console.log('❌ No token found anywhere');
+        isAuthenticated = false;
+        authStatus.textContent = 'Not connected to GitHub';
+        authStatus.className = 'auth-status not-authenticated';
+        githubAuthBtn.textContent = 'Connect to GitHub';
+    }
+
+    // ✅ NEW: Initialize app with a token
+    async function initializeWithToken(token) {
+        githubToken = token;
+        isAuthenticated = true;
+        authStatus.textContent = 'Checking token...';
+        authStatus.className = 'auth-status authenticated';
+        githubAuthBtn.textContent = 'Update Token';
+
+        const valid = await testToken();
+        if (valid) {
+            console.log('✅ Token is valid!');
+            authStatus.textContent = 'Connected to GitHub';
+            await checkRepositoryAccess();
+        } else {
+            console.log('❌ Token is invalid');
+            await handleInvalidToken();
+        }
+    }
+
+    // Test token validity
     async function testToken() {
-        console.log('🧪 Testing token validity...');
         try {
             const response = await fetch('https://api.github.com/user', {
                 headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'Accept': 'application/vnd.github.v3+json'
+                    'Authorization': `token ${githubToken}`
                 }
             });
-            
-            console.log('🔍 Token test response status:', response.status, response.statusText);
-            
-            if (response.ok) {
-                const userData = await response.json();
-                console.log('✅ Token valid! Connected as user:', userData.login);
-                return true;
-            } else {
-                console.log('❌ Token invalid. Response:', await response.text());
-                return false;
-            }
+            return response.ok;
         } catch (error) {
-            console.log('❌ Token test error:', error);
             return false;
         }
     }
 
-    // Save token to browser storage
-    function saveToken(token) {
-        if (!token || token.trim() === '') {
-            console.log('❌ Empty token provided');
-            return false;
-        }
-        
-        // Clean the token (remove any spaces or quotes)
-        token = token.trim().replace(/["']/g, '');
-        
-        console.log('💾 Saving token to localStorage...');
-        console.log('📝 Token to save (first 10 chars):', token.substring(0, 10) + '...');
-        
-        localStorage.setItem('githubToken', token);
-        githubToken = token;
-        console.log('✅ Token saved to localStorage');
-        return true;
+    // Handle invalid token
+    async function handleInvalidToken() {
+        localStorage.removeItem('githubToken');
+        localStorage.removeItem('moneyTrackerGistId');
+        githubToken = null;
+        isAuthenticated = false;
+        GITHUB_CONFIG.GIST_ID = null;
+        authStatus.textContent = 'Token expired - please reconnect';
+        authStatus.className = 'auth-status not-authenticated';
+        githubAuthBtn.textContent = 'Connect to GitHub';
     }
 
-    // ✅ DEBUG: Enhanced repository access check
+    // Check repository access
     async function checkRepositoryAccess() {
-        if (!isAuthenticated) {
-            console.log('❌ Not authenticated, skipping repository check');
-            return;
-        }
-        
-        console.log('🔍 Checking repository access...');
-        console.log('📁 Repository:', `${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
+        if (!isAuthenticated) return;
         
         try {
             repoStatus.innerHTML = '<span class="loading"></span>Checking repository access...';
-            
-            const repoData = await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
-            console.log('✅ Repository access successful!', repoData);
+            await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
             
             repoStatus.textContent = `✓ Connected to: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
             repoStatus.className = 'auth-status authenticated';
             
-            loadTransactionsFromGitHub();
+            await loadTransactionsFromGitHub();
         } catch (error) {
-            console.log('❌ Repository access failed:', error);
-            console.log('🔍 Error details:', {
-                status: error.status,
-                message: error.message,
-                repository: `${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`
-            });
-            
-            if (error.status === 404) {
-                repoStatus.textContent = `✗ Repository not found: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
-                repoStatus.className = 'auth-status not-authenticated';
-                alert(`❌ Repository not found!\n\nPlease check:\n1. Repository name: "${GITHUB_CONFIG.REPO_NAME}"\n2. It exists on GitHub\n3. Your token has access to it`);
-            } else if (error.status === 403) {
-                repoStatus.textContent = '✗ Access forbidden - check token permissions';
-                repoStatus.className = 'auth-status not-authenticated';
-                alert('❌ Access forbidden!\n\nYour token needs "repo" permissions to access private repositories.');
-            } else if (error.status === 401) {
-                repoStatus.textContent = '✗ Invalid token';
-                repoStatus.className = 'auth-status not-authenticated';
-                // Token is invalid, clear it
-                localStorage.removeItem('githubToken');
-                githubToken = null;
-                isAuthenticated = false;
-                loadToken();
-            } else {
-                repoStatus.textContent = `✗ Error: ${error.status} - ${error.message}`;
-                repoStatus.className = 'auth-status not-authenticated';
-            }
+            repoStatus.textContent = '✗ Error accessing repository';
+            repoStatus.className = 'auth-status not-authenticated';
         }
     }
 
-    // ✅ DEBUG: Enhanced GitHub authentication
+    // GitHub authentication - saves to Gist
     async function authenticateWithGitHub() {
-        console.log('🔐 Starting authentication...');
-        
-        // Check if we already have a token
-        if (githubToken) {
-            console.log('ℹ️ Already have a token, offering to update');
-            if (confirm('You are already connected. Do you want to update your token?')) {
-                const newToken = prompt('Enter new GitHub Personal Access Token:');
-                if (newToken) {
-                    if (saveToken(newToken)) {
-                        loadToken();
-                        alert('✅ Token updated! Testing connection...');
-                    }
-                }
-            }
-            return;
-        }
-        
-        // No token exists, ask for one
-        console.log('🆕 No token found, requesting new token');
         const token = prompt(`🔐 GitHub Personal Access Token Required
 
-Please enter your token with "repo" permissions.
+This token will be stored securely in a PRIVATE GitHub Gist and will work across all your devices.
 
-Your repository: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}
+Enter your token with "repo" and "gist" permissions:
 
 Need a token?
 1. Go to: https://github.com/settings/tokens
 2. Click "Generate new token (classic)" 
-3. Name: "Money Tracker"
-4. Expiration: 6 months or 1 year
-5. Select: ✅ "repo" (FULL CHECKBOX)
-6. Click "Generate token"
-7. COPY the token and paste here:`);
+3. Select: ✅ "repo" AND ✅ "gist"
+4. Generate and paste here:`);
 
         if (token) {
-            console.log('📥 Token received from user');
+            authStatus.innerHTML = '<span class="loading"></span>Saving token to cloud...';
             
-            if (!saveToken(token)) {
-                alert('❌ Invalid token format. Please try again.');
-                return;
-            }
+            // Save to Gist (cloud storage)
+            const saved = await saveTokenToGist(token);
             
-            // Test the token
-            authStatus.innerHTML = '<span class="loading"></span>Testing token...';
-            console.log('🧪 Testing new token...');
-            
-            const valid = await testToken();
-            
-            if (valid) {
-                console.log('✅ New token is valid! Loading repository...');
-                loadToken();
-                alert('✅ Successfully connected! Your token is saved in this browser.');
+            if (saved) {
+                // Also save to localStorage as backup
+                localStorage.setItem('githubToken', token);
+                await initializeWithToken(token);
+                alert('✅ Token saved to cloud! It will work on all your devices.');
             } else {
-                console.log('❌ New token is invalid');
-                localStorage.removeItem('githubToken');
-                githubToken = null;
-                authStatus.textContent = 'Invalid token - please try again';
-                authStatus.className = 'auth-status not-authenticated';
-                alert(`❌ Invalid token!
-
-Please check:
-1. Token has "repo" scope (FULL checkbox)
-2. Token is copied completely
-3. No extra spaces before/after token
-4. Token is not expired
-
-Try creating a new token and try again.`);
+                alert('❌ Failed to save token to cloud. Please check your token has "gist" permission.');
             }
-        } else {
-            console.log('❌ User cancelled token input');
         }
     }
 
-    // ✅ DEBUG: Enhanced GitHub API call helper
+    // GitHub API call helper
     async function githubApiCall(endpoint, method = 'GET', body = null) {
         const url = `https://api.github.com${endpoint}`;
-        console.log('🌐 GitHub API Call:', method, endpoint);
-        
         const options = {
             method,
             headers: {
@@ -705,34 +722,22 @@ Try creating a new token and try again.`);
         
         if (body) {
             options.body = JSON.stringify(body);
-            console.log('📦 Request body:', body);
         }
         
         const response = await fetch(url, options);
-        console.log('📡 Response status:', response.status, response.statusText);
         
         if (!response.ok) {
-            const errorText = await response.text();
-            console.log('❌ API Error response:', errorText);
-            const error = new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+            const error = new Error(`GitHub API error: ${response.status}`);
             error.status = response.status;
-            error.responseText = errorText;
             throw error;
         }
         
-        const data = await response.json();
-        console.log('✅ API call successful');
-        return data;
+        return response.json();
     }
 
     // Load transactions from GitHub
     async function loadTransactionsFromGitHub() {
-        if (!isAuthenticated) {
-            console.log('❌ Not authenticated, skipping data load');
-            return;
-        }
-        
-        console.log('📥 Loading transactions from GitHub...');
+        if (!isAuthenticated) return;
         
         try {
             authStatus.innerHTML = '<span class="loading"></span>Loading data from GitHub...';
@@ -741,27 +746,21 @@ Try creating a new token and try again.`);
                 `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
             );
             
-            console.log('✅ Data file found, decoding...');
             const content = JSON.parse(atob(fileData.content));
             transactions = content.transactions || [];
-            console.log(`✅ Loaded ${transactions.length} transactions`);
             
             renderTransactions();
             updateSummary();
             
             authStatus.textContent = 'Connected to GitHub';
         } catch (error) {
-            console.log('❌ Error loading transactions:', error);
-            
             if (error.status === 404) {
-                console.log('ℹ️ No data file found (first time setup)');
                 transactions = [];
                 renderTransactions();
                 updateSummary();
                 authStatus.textContent = 'Connected to GitHub (ready for new data)';
             } else {
                 authStatus.textContent = 'Error loading data';
-                console.log('🔍 Load error details:', error);
             }
         }
     }
@@ -769,12 +768,9 @@ Try creating a new token and try again.`);
     // Save transactions to GitHub
     async function saveTransactionsToGitHub() {
         if (!isAuthenticated) {
-            console.log('⚠️ Not authenticated, saving to localStorage only');
             localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
             return false;
         }
-        
-        console.log('💾 Saving transactions to GitHub...');
         
         try {
             authStatus.innerHTML = '<span class="loading"></span>Saving to GitHub...';
@@ -785,23 +781,15 @@ Try creating a new token and try again.`);
                     `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
                 );
                 sha = fileData.sha;
-                console.log('📝 Updating existing file, SHA:', sha);
             } catch (error) {
-                if (error.status === 404) {
-                    console.log('📝 Creating new file (first save)');
-                } else {
-                    throw error;
-                }
+                if (error.status !== 404) throw error;
             }
             
             const content = {
                 transactions: transactions,
                 lastUpdated: new Date().toISOString(),
-                totalBalance: calculateBalance(),
-                totalTransactions: transactions.length
+                totalBalance: calculateBalance()
             };
-            
-            console.log(`💾 Saving ${transactions.length} transactions`);
             
             const contentBase64 = btoa(JSON.stringify(content, null, 2));
             
@@ -809,18 +797,16 @@ Try creating a new token and try again.`);
                 `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`,
                 'PUT',
                 {
-                    message: `Money Tracker: ${transactions.length} transactions`,
+                    message: `Update: ${transactions.length} transactions`,
                     content: contentBase64,
                     sha: sha
                 }
             );
             
-            console.log('✅ Transactions saved to GitHub successfully');
             authStatus.textContent = 'Connected to GitHub';
             return true;
         } catch (error) {
-            console.log('❌ Error saving to GitHub:', error);
-            // Fallback to localStorage
+            console.error('Error saving to GitHub:', error);
             localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
             authStatus.textContent = 'Error saving - using local storage';
             return false;
@@ -1133,7 +1119,6 @@ Try creating a new token and try again.`);
     githubAuthBtn.addEventListener('click', authenticateWithGitHub);
 
     // Initialize
-    console.log('🚀 Initializing Money Tracker...');
     loadToken();
     
     // Load any local transactions if not authenticated
@@ -1143,22 +1128,14 @@ Try creating a new token and try again.`);
         updateSummary();
     }
 
-    // Add debug info to page
-    const debugInfo = document.createElement('div');
-    debugInfo.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; font-size: 12px; z-index: 1000;';
-    debugInfo.innerHTML = `
-        <strong>Debug Info:</strong><br>
-        Repo: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}<br>
-        Status: <span id="debug-status">Loading...</span>
+    // Add cloud status indicator
+    const cloudStatus = document.createElement('div');
+    cloudStatus.style.cssText = 'position: fixed; bottom: 10px; right: 10px; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; border-radius: 5px; font-size: 12px; z-index: 1000;';
+    cloudStatus.innerHTML = `
+        <strong>Cloud Status:</strong><br>
+        <span id="cloud-status">${GITHUB_CONFIG.GIST_ID ? '✅ Token in Cloud' : '❌ No Cloud Token'}</span>
     `;
-    document.body.appendChild(debugInfo);
-
-    // Update debug status
-    setInterval(() => {
-        document.getElementById('debug-status').textContent = isAuthenticated ? 'Connected' : 'Not Connected';
-    }, 1000);
-
-    console.log('✅ Money Tracker initialized');
+    document.body.appendChild(cloudStatus);
 </script>
 </body>
 </html>
