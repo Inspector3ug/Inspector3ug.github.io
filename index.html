@@ -349,10 +349,11 @@
         </header>
         
         <div class="github-auth">
-            <h3>GitHub Authentication</h3>
-            <p>Connect to GitHub to save your data in a repository</p>
-            <button id="github-auth-btn">Connect to GitHub</button>
-            <div id="auth-status" class="auth-status not-authenticated">Not connected</div>
+            <h3>GitHub Integration</h3>
+            <p>Connect to your GitHub repository to save data</p>
+            <button id="github-auth-btn">Connect to GitHub Repository</button>
+            <div id="auth-status" class="auth-status not-authenticated">Not connected to GitHub</div>
+            <div id="repo-status" class="auth-status" style="margin-top: 5px; font-size: 0.8rem;"></div>
         </div>
         
         <div class="summary-cards">
@@ -457,11 +458,12 @@
         const totalExpensesEl = document.getElementById('total-expenses');
         const githubAuthBtn = document.getElementById('github-auth-btn');
         const authStatus = document.getElementById('auth-status');
+        const repoStatus = document.getElementById('repo-status');
 
-        // GitHub configuration
+        // ⚠️ IMPORTANT: UPDATE THESE VALUES WITH YOUR ACTUAL REPOSITORY INFO ⚠️
         const GITHUB_CONFIG = {
-            REPO_OWNER: 'your-username', // Replace with your GitHub username
-            REPO_NAME: 'money-tracker-data', // Replace with your repository name
+            REPO_OWNER: 'Inspector3ug',      // Replace with your GitHub username
+            REPO_NAME: 'money-data-records',       // Replace with your repository name
             DATA_FILE: 'transactions.json'
         };
 
@@ -481,54 +483,49 @@
                 authStatus.textContent = 'Connected to GitHub';
                 authStatus.className = 'auth-status authenticated';
                 githubAuthBtn.textContent = 'Reconnect to GitHub';
-                loadTransactionsFromGitHub();
+                checkRepositoryAccess();
             } else {
                 isAuthenticated = false;
-                authStatus.textContent = 'Not connected';
+                authStatus.textContent = 'Not connected to GitHub';
                 authStatus.className = 'auth-status not-authenticated';
-                githubAuthBtn.textContent = 'Connect to GitHub';
+                githubAuthBtn.textContent = 'Connect to GitHub Repository';
+                repoStatus.textContent = '';
+            }
+        }
+
+        // Check if we can access the repository
+        async function checkRepositoryAccess() {
+            if (!isAuthenticated) return;
+            
+            try {
+                repoStatus.innerHTML = '<span class="loading"></span>Checking repository access...';
+                
+                await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
+                
+                repoStatus.textContent = `✓ Connected to repository: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
+                repoStatus.className = 'auth-status authenticated';
+                
+                // Load transactions from the repository
+                loadTransactionsFromGitHub();
+            } catch (error) {
+                if (error.status === 404) {
+                    repoStatus.textContent = `✗ Repository not found: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
+                    repoStatus.className = 'auth-status not-authenticated';
+                } else {
+                    repoStatus.textContent = '✗ Error accessing repository';
+                    repoStatus.className = 'auth-status not-authenticated';
+                }
             }
         }
 
         // GitHub authentication
         async function authenticateWithGitHub() {
-            // In a real implementation, you would use GitHub OAuth
-            // For simplicity, we'll use a personal access token
-            const token = prompt('Please enter your GitHub Personal Access Token:');
+            const token = prompt(`Please enter your GitHub Personal Access Token:\n\nMake sure your token has "repo" scope and you have access to:\n${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
             
             if (token) {
                 githubToken = token;
                 localStorage.setItem('githubToken', token);
                 checkAuthentication();
-                
-                // Try to create repository if it doesn't exist
-                try {
-                    await createRepositoryIfNotExists();
-                    alert('Successfully connected to GitHub!');
-                } catch (error) {
-                    console.error('Error creating repository:', error);
-                    alert('Authentication successful but could not create repository. Please check your token permissions.');
-                }
-            }
-        }
-
-        // Create repository if it doesn't exist
-        async function createRepositoryIfNotExists() {
-            try {
-                // Check if repository exists
-                await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
-            } catch (error) {
-                if (error.status === 404) {
-                    // Repository doesn't exist, create it
-                    await githubApiCall('/user/repos', 'POST', {
-                        name: GITHUB_CONFIG.REPO_NAME,
-                        description: 'Personal Money Tracker Data',
-                        private: true,
-                        auto_init: true
-                    });
-                } else {
-                    throw error;
-                }
             }
         }
 
@@ -567,7 +564,6 @@
             }
             
             try {
-                // Show loading state
                 authStatus.innerHTML = '<span class="loading"></span>Loading data from GitHub...';
                 
                 // Get file content
@@ -582,8 +578,8 @@
                 renderTransactions();
                 updateSummary();
                 
-                // Reset auth status
-                checkAuthentication();
+                authStatus.textContent = 'Connected to GitHub';
+                authStatus.className = 'auth-status authenticated';
             } catch (error) {
                 if (error.status === 404) {
                     // File doesn't exist yet, that's OK
@@ -591,13 +587,12 @@
                     transactions = [];
                     renderTransactions();
                     updateSummary();
+                    authStatus.textContent = 'Connected to GitHub (new repository)';
                 } else {
                     console.error('Error loading from GitHub:', error);
-                    alert('Error loading data from GitHub. Please check your connection and try again.');
+                    authStatus.textContent = 'Error loading data from GitHub';
+                    authStatus.className = 'auth-status not-authenticated';
                 }
-                
-                // Reset auth status
-                checkAuthentication();
             }
         }
 
@@ -609,7 +604,6 @@
             }
             
             try {
-                // Show saving state
                 authStatus.innerHTML = '<span class="loading"></span>Saving to GitHub...';
                 
                 // Get current file SHA if it exists
@@ -627,7 +621,8 @@
                 // Prepare content
                 const content = {
                     transactions: transactions,
-                    lastUpdated: new Date().toISOString()
+                    lastUpdated: new Date().toISOString(),
+                    totalTransactions: transactions.length
                 };
                 
                 // Encode content to base64
@@ -638,20 +633,18 @@
                     `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`,
                     'PUT',
                     {
-                        message: 'Update money tracker data',
+                        message: `Update money tracker data (${transactions.length} transactions)`,
                         content: contentBase64,
                         sha: sha
                     }
                 );
                 
-                // Reset auth status
-                checkAuthentication();
+                authStatus.textContent = 'Connected to GitHub';
+                authStatus.className = 'auth-status authenticated';
             } catch (error) {
                 console.error('Error saving to GitHub:', error);
-                alert('Error saving data to GitHub. Please check your connection and try again.');
-                
-                // Reset auth status
-                checkAuthentication();
+                authStatus.textContent = 'Error saving data to GitHub';
+                authStatus.className = 'auth-status not-authenticated';
             }
         }
 
