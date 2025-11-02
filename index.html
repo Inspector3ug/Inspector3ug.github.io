@@ -446,556 +446,608 @@
     </div>
 
     <script>
-        // DOM Elements
-        const transactionForm = document.getElementById('transaction-form');
-        const transactionList = document.getElementById('transaction-list');
-        const noDataMessage = document.getElementById('no-data-message');
-        const exportBtn = document.getElementById('export-btn');
-        const importFile = document.getElementById('import-file');
-        const clearBtn = document.getElementById('clear-btn');
-        const currentBalanceEl = document.getElementById('current-balance');
-        const totalIncomeEl = document.getElementById('total-income');
-        const totalExpensesEl = document.getElementById('total-expenses');
-        const githubAuthBtn = document.getElementById('github-auth-btn');
-        const authStatus = document.getElementById('auth-status');
-        const repoStatus = document.getElementById('repo-status');
+    // DOM Elements
+    const transactionForm = document.getElementById('transaction-form');
+    const transactionList = document.getElementById('transaction-list');
+    const noDataMessage = document.getElementById('no-data-message');
+    const exportBtn = document.getElementById('export-btn');
+    const importFile = document.getElementById('import-file');
+    const clearBtn = document.getElementById('clear-btn');
+    const currentBalanceEl = document.getElementById('current-balance');
+    const totalIncomeEl = document.getElementById('total-income');
+    const totalExpensesEl = document.getElementById('total-expenses');
+    const githubAuthBtn = document.getElementById('github-auth-btn');
+    const authStatus = document.getElementById('auth-status');
+    const repoStatus = document.getElementById('repo-status');
 
-        // ⚠️ IMPORTANT: UPDATE THESE VALUES WITH YOUR ACTUAL REPOSITORY INFO ⚠️
-        const GITHUB_CONFIG = {
-            REPO_OWNER: 'Inspector3ug',      // Replace with your GitHub username
-            REPO_NAME: 'money-data-records',       // Replace with your repository name
-            DATA_FILE: 'transactions.json'
-        };
+    // ⚠️ UPDATE THESE WITH YOUR INFO
+    const GITHUB_CONFIG = {
+        REPO_OWNER: 'inspector3ug',
+        REPO_NAME: 'money-tracker-data',      // Your PRIVATE data repo
+        DATA_FILE: 'transactions.json',
+        // Token will be stored in browser localStorage (not in GitHub)
+    };
 
-        // Set default date and time to current
-        document.getElementById('date').valueAsDate = new Date();
-        document.getElementById('time').value = new Date().toTimeString().slice(0, 5);
+    // Set default date and time
+    document.getElementById('date').valueAsDate = new Date();
+    document.getElementById('time').value = new Date().toTimeString().slice(0, 5);
 
-        // Global variables
-        let transactions = [];
-        let githubToken = localStorage.getItem('githubToken');
-        let isAuthenticated = false;
+    // Global variables
+    let transactions = [];
+    let githubToken = null;
+    let isAuthenticated = false;
 
-        // Check if user is authenticated
-        function checkAuthentication() {
-            if (githubToken) {
-                isAuthenticated = true;
-                authStatus.textContent = 'Connected to GitHub';
-                authStatus.className = 'auth-status authenticated';
-                githubAuthBtn.textContent = 'Reconnect to GitHub';
-                checkRepositoryAccess();
-            } else {
-                isAuthenticated = false;
-                authStatus.textContent = 'Not connected to GitHub';
-                authStatus.className = 'auth-status not-authenticated';
-                githubAuthBtn.textContent = 'Connect to GitHub Repository';
-                repoStatus.textContent = '';
-            }
-        }
-
-        // Check if we can access the repository
-        async function checkRepositoryAccess() {
-            if (!isAuthenticated) return;
+    // ✅ SIMPLE SOLUTION: Use localStorage properly
+    function loadToken() {
+        githubToken = localStorage.getItem('githubToken');
+        if (githubToken) {
+            console.log('Token loaded from browser storage');
+            isAuthenticated = true;
+            authStatus.textContent = 'Connected to GitHub';
+            authStatus.className = 'auth-status authenticated';
+            githubAuthBtn.textContent = 'Update Token';
             
-            try {
-                repoStatus.innerHTML = '<span class="loading"></span>Checking repository access...';
-                
-                await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
-                
-                repoStatus.textContent = `✓ Connected to repository: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
-                repoStatus.className = 'auth-status authenticated';
-                
-                // Load transactions from the repository
-                loadTransactionsFromGitHub();
-            } catch (error) {
-                if (error.status === 404) {
-                    repoStatus.textContent = `✗ Repository not found: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
-                    repoStatus.className = 'auth-status not-authenticated';
+            // Test the token
+            testToken().then(valid => {
+                if (valid) {
+                    checkRepositoryAccess();
                 } else {
-                    repoStatus.textContent = '✗ Error accessing repository';
-                    repoStatus.className = 'auth-status not-authenticated';
+                    // Token is invalid, clear it
+                    localStorage.removeItem('githubToken');
+                    githubToken = null;
+                    isAuthenticated = false;
+                    authStatus.textContent = 'Token expired - please reconnect';
+                    authStatus.className = 'auth-status not-authenticated';
                 }
-            }
+            });
+        } else {
+            isAuthenticated = false;
+            authStatus.textContent = 'Not connected to GitHub';
+            authStatus.className = 'auth-status not-authenticated';
+            githubAuthBtn.textContent = 'Connect to GitHub';
         }
+    }
 
-        // GitHub authentication
-        async function authenticateWithGitHub() {
-            const token = prompt(`Please enter your GitHub Personal Access Token:\n\nMake sure your token has "repo" scope and you have access to:\n${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
-            
-            if (token) {
-                githubToken = token;
-                localStorage.setItem('githubToken', token);
-                checkAuthentication();
-            }
-        }
-
-        // GitHub API call helper
-        async function githubApiCall(endpoint, method = 'GET', body = null) {
-            const url = `https://api.github.com${endpoint}`;
-            const options = {
-                method,
+    // ✅ Test if token is valid
+    async function testToken() {
+        try {
+            const response = await fetch('https://api.github.com/user', {
                 headers: {
-                    'Authorization': `token ${githubToken}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
+                    'Authorization': `token ${githubToken}`
                 }
-            };
-            
-            if (body) {
-                options.body = JSON.stringify(body);
-            }
-            
-            const response = await fetch(url, options);
-            
-            if (!response.ok) {
-                const error = new Error(`GitHub API error: ${response.status}`);
-                error.status = response.status;
-                throw error;
-            }
-            
-            return response.json();
+            });
+            return response.ok;
+        } catch (error) {
+            return false;
         }
+    }
 
-        // Load transactions from GitHub
-        async function loadTransactionsFromGitHub() {
-            if (!isAuthenticated) {
-                console.log('Not authenticated, cannot load from GitHub');
-                return;
-            }
+    // Save token to browser storage
+    function saveToken(token) {
+        localStorage.setItem('githubToken', token);
+        githubToken = token;
+        console.log('Token saved to browser storage');
+    }
+
+    // Check repository access
+    async function checkRepositoryAccess() {
+        if (!isAuthenticated) return;
+        
+        try {
+            repoStatus.innerHTML = '<span class="loading"></span>Checking repository access...';
+            await githubApiCall(`/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`);
             
-            try {
-                authStatus.innerHTML = '<span class="loading"></span>Loading data from GitHub...';
-                
-                // Get file content
-                const fileData = await githubApiCall(
-                    `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
-                );
-                
-                // Decode content from base64
-                const content = JSON.parse(atob(fileData.content));
-                transactions = content.transactions || [];
-                
-                renderTransactions();
-                updateSummary();
-                
-                authStatus.textContent = 'Connected to GitHub';
-                authStatus.className = 'auth-status authenticated';
-            } catch (error) {
-                if (error.status === 404) {
-                    // File doesn't exist yet, that's OK
-                    console.log('No data file found, starting with empty transactions');
+            repoStatus.textContent = `✓ Connected to: ${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}`;
+            repoStatus.className = 'auth-status authenticated';
+            
+            loadTransactionsFromGitHub();
+        } catch (error) {
+            repoStatus.textContent = '✗ Error accessing repository';
+            repoStatus.className = 'auth-status not-authenticated';
+        }
+    }
+
+    // GitHub authentication
+    async function authenticateWithGitHub() {
+        // Check if we already have a token
+        if (githubToken) {
+            if (confirm('You are already connected. Do you want to update your token?')) {
+                const newToken = prompt('Enter new GitHub Personal Access Token:');
+                if (newToken) {
+                    saveToken(newToken);
+                    loadToken();
+                    alert('✅ Token updated!');
+                }
+            }
+            return;
+        }
+        
+        // No token exists, ask for one
+        const token = prompt(`🔐 GitHub Personal Access Token Required
+
+Please enter your token with "repo" permissions.
+
+Need a token?
+1. Go to: https://github.com/settings/tokens
+2. Click "Generate new token" 
+3. Select "repo" scope
+4. Copy the token and paste it here:`);
+
+        if (token) {
+            saveToken(token);
+            
+            // Test the token
+            authStatus.innerHTML = '<span class="loading"></span>Testing token...';
+            const valid = await testToken();
+            
+            if (valid) {
+                loadToken();
+                alert('✅ Successfully connected! Your token is saved in this browser.');
+            } else {
+                localStorage.removeItem('githubToken');
+                githubToken = null;
+                authStatus.textContent = 'Invalid token - please try again';
+                authStatus.className = 'auth-status not-authenticated';
+                alert('❌ Invalid token. Please check your token and try again.');
+            }
+        }
+    }
+
+    // GitHub API call helper
+    async function githubApiCall(endpoint, method = 'GET', body = null) {
+        const url = `https://api.github.com${endpoint}`;
+        const options = {
+            method,
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            }
+        };
+        
+        if (body) {
+            options.body = JSON.stringify(body);
+        }
+        
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            const error = new Error(`GitHub API error: ${response.status}`);
+            error.status = response.status;
+            throw error;
+        }
+        
+        return response.json();
+    }
+
+    // Load transactions from GitHub
+    async function loadTransactionsFromGitHub() {
+        if (!isAuthenticated) return;
+        
+        try {
+            authStatus.innerHTML = '<span class="loading"></span>Loading data from GitHub...';
+            
+            const fileData = await githubApiCall(
+                `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
+            );
+            
+            const content = JSON.parse(atob(fileData.content));
+            transactions = content.transactions || [];
+            
+            renderTransactions();
+            updateSummary();
+            
+            authStatus.textContent = 'Connected to GitHub';
+        } catch (error) {
+            if (error.status === 404) {
+                // No data file yet
+                const localData = JSON.parse(localStorage.getItem('moneyTrackerTransactions') || '[]');
+                if (localData.length > 0) {
+                    transactions = localData;
+                    renderTransactions();
+                    updateSummary();
+                    // Offer to save local data to GitHub
+                    setTimeout(() => {
+                        if (confirm('Found local transactions. Save them to GitHub?')) {
+                            saveTransactionsToGitHub();
+                        }
+                    }, 1000);
+                } else {
                     transactions = [];
                     renderTransactions();
                     updateSummary();
-                    authStatus.textContent = 'Connected to GitHub (new repository)';
-                } else {
-                    console.error('Error loading from GitHub:', error);
-                    authStatus.textContent = 'Error loading data from GitHub';
-                    authStatus.className = 'auth-status not-authenticated';
                 }
+                authStatus.textContent = 'Connected to GitHub (ready for new data)';
+            } else {
+                authStatus.textContent = 'Error loading data';
             }
         }
+    }
 
-        // Save transactions to GitHub
-        async function saveTransactionsToGitHub() {
-            if (!isAuthenticated) {
-                console.log('Not authenticated, cannot save to GitHub');
-                return;
+    // Save transactions to GitHub
+    async function saveTransactionsToGitHub() {
+        if (!isAuthenticated) {
+            // Fallback to localStorage
+            localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
+            return false;
+        }
+        
+        try {
+            authStatus.innerHTML = '<span class="loading"></span>Saving to GitHub...';
+            
+            let sha = null;
+            try {
+                const fileData = await githubApiCall(
+                    `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
+                );
+                sha = fileData.sha;
+            } catch (error) {
+                if (error.status !== 404) throw error;
             }
             
-            try {
-                authStatus.innerHTML = '<span class="loading"></span>Saving to GitHub...';
+            const content = {
+                transactions: transactions,
+                lastUpdated: new Date().toISOString(),
+                totalBalance: calculateBalance()
+            };
+            
+            const contentBase64 = btoa(JSON.stringify(content, null, 2));
+            
+            await githubApiCall(
+                `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`,
+                'PUT',
+                {
+                    message: `Update: ${transactions.length} transactions`,
+                    content: contentBase64,
+                    sha: sha
+                }
+            );
+            
+            authStatus.textContent = 'Connected to GitHub';
+            return true;
+        } catch (error) {
+            console.error('Error saving to GitHub:', error);
+            // Fallback to localStorage
+            localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
+            authStatus.textContent = 'Error saving - using local storage';
+            return false;
+        }
+    }
+
+    // Calculate balance
+    function calculateBalance() {
+        const totalIncome = transactions
+            .filter(t => t.type === 'In')
+            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalExpenses = transactions
+            .filter(t => t.type === 'Out')
+            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        return totalIncome - totalExpenses;
+    }
+
+    // Format currency in IDR
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0
+        }).format(amount);
+    }
+
+    // Get month name from date string
+    function getMonthName(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    // Group transactions by month
+    function groupTransactionsByMonth() {
+        const grouped = {};
+        
+        transactions.forEach(transaction => {
+            const monthKey = getMonthName(transaction.date);
+            
+            if (!grouped[monthKey]) {
+                grouped[monthKey] = [];
+            }
+            
+            grouped[monthKey].push(transaction);
+        });
+        
+        return grouped;
+    }
+
+    // Update summary cards
+    function updateSummary() {
+        const totalIncome = transactions
+            .filter(t => t.type === 'In')
+            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalExpenses = transactions
+            .filter(t => t.type === 'Out')
+            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const balance = totalIncome - totalExpenses;
+        
+        currentBalanceEl.textContent = formatCurrency(balance);
+        totalIncomeEl.textContent = formatCurrency(totalIncome);
+        totalExpensesEl.textContent = formatCurrency(totalExpenses);
+    }
+
+    // Render transactions grouped by month
+    function renderTransactions() {
+        if (transactions.length === 0) {
+            noDataMessage.classList.remove('hidden');
+            transactionList.innerHTML = '';
+            return;
+        }
+        
+        noDataMessage.classList.add('hidden');
+        
+        const groupedTransactions = groupTransactionsByMonth();
+        let html = '';
+        
+        const sortedMonths = Object.keys(groupedTransactions).sort((a, b) => {
+            return new Date(b) - new Date(a);
+        });
+        
+        sortedMonths.forEach(month => {
+            const monthTransactions = groupedTransactions[month];
+            
+            const monthIncome = monthTransactions
+                .filter(t => t.type === 'In')
+                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+            const monthExpenses = monthTransactions
+                .filter(t => t.type === 'Out')
+                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+            const monthBalance = monthIncome - monthExpenses;
+            
+            html += `
+            <div class="month-section">
+                <div class="month-header">${month}</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Type</th>
+                            <th>Amount (IDR)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${monthTransactions.map((transaction, index) => {
+                            const globalIndex = transactions.findIndex(t => 
+                                t.date === transaction.date && 
+                                t.time === transaction.time && 
+                                t.category === transaction.category && 
+                                t.cost === transaction.cost
+                            );
+                            
+                            return `
+                            <tr>
+                                <td>${transaction.date}</td>
+                                <td>${transaction.time}</td>
+                                <td>${transaction.category}</td>
+                                <td>${transaction.description || '-'}</td>
+                                <td class="${transaction.type === 'In' ? 'type-in' : 'type-out'}">${transaction.type}</td>
+                                <td>${formatCurrency(parseFloat(transaction.cost))}</td>
+                                <td class="actions">
+                                    <button class="btn btn-danger btn-sm" onclick="deleteTransaction(${globalIndex})">Delete</button>
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+                <div class="month-summary">
+                    <div class="month-income">Income: ${formatCurrency(monthIncome)}</div>
+                    <div class="month-expense">Expenses: ${formatCurrency(monthExpenses)}</div>
+                    <div class="month-balance">Balance: ${formatCurrency(monthBalance)}</div>
+                </div>
+            </div>
+            `;
+        });
+        
+        transactionList.innerHTML = html;
+    }
+
+    // Add new transaction
+    async function addTransaction(event) {
+        event.preventDefault();
+        
+        const date = document.getElementById('date').value;
+        const time = document.getElementById('time').value;
+        const category = document.getElementById('category').value;
+        const description = document.getElementById('description').value;
+        const type = document.getElementById('type').value;
+        const cost = document.getElementById('cost').value;
+        
+        const transaction = {
+            date,
+            time,
+            category,
+            description,
+            type,
+            cost: parseFloat(cost)
+        };
+        
+        transactions.push(transaction);
+        await saveTransactionsToGitHub();
+        renderTransactions();
+        updateSummary();
+        
+        transactionForm.reset();
+        document.getElementById('date').valueAsDate = new Date();
+        document.getElementById('time').value = new Date().toTimeString().slice(0, 5);
+    }
+
+    // Delete transaction
+    async function deleteTransaction(index) {
+        if (confirm('Are you sure you want to delete this transaction?')) {
+            transactions.splice(index, 1);
+            await saveTransactionsToGitHub();
+            renderTransactions();
+            updateSummary();
+        }
+    }
+
+    // Export to CSV
+    function exportToExcel() {
+        if (transactions.length === 0) {
+            alert('No data to export');
+            return;
+        }
+        
+        let csvContent = "Date,Time,Category,Description,Type,Cost\n";
+        
+        transactions.forEach(transaction => {
+            csvContent += `"${transaction.date}","${transaction.time}","${transaction.category}","${transaction.description || ''}","${transaction.type}",${transaction.cost}\n`;
+        });
+        
+        const totalIncome = transactions
+            .filter(t => t.type === 'In')
+            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const totalExpenses = transactions
+            .filter(t => t.type === 'Out')
+            .reduce((sum, t) => sum + parseFloat(t.cost), 0);
+        const balance = totalIncome - totalExpenses;
+        
+        csvContent += `\nTOTAL (in a month),,,,,\n`;
+        csvContent += `,,,,"Balance",${balance}\n`;
+        csvContent += `,,,,"Total Income",${totalIncome}\n`;
+        csvContent += `,,,,"Total Expenses",${totalExpenses}\n`;
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'money-tracker-export.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // Import from CSV
+    async function importFromCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const csvContent = e.target.result;
+            const lines = csvContent.split('\n');
+            const importedTransactions = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
                 
-                // Get current file SHA if it exists
-                let sha = null;
-                try {
-                    const fileData = await githubApiCall(
-                        `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`
-                    );
-                    sha = fileData.sha;
-                } catch (error) {
-                    // File doesn't exist yet, that's OK
-                    if (error.status !== 404) throw error;
+                const values = [];
+                let inQuotes = false;
+                let currentValue = '';
+                
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(currentValue);
+                        currentValue = '';
+                    } else {
+                        currentValue += char;
+                    }
                 }
                 
-                // Prepare content
-                const content = {
-                    transactions: transactions,
-                    lastUpdated: new Date().toISOString(),
-                    totalTransactions: transactions.length
+                values.push(currentValue);
+                
+                if (values[0].includes('TOTAL') || !values[0]) continue;
+                
+                const transaction = {
+                    date: values[0].replace(/"/g, ''),
+                    time: values[1].replace(/"/g, ''),
+                    category: values[2].replace(/"/g, ''),
+                    description: values[3].replace(/"/g, ''),
+                    type: values[4].replace(/"/g, ''),
+                    cost: parseFloat(values[5].replace(/"/g, ''))
                 };
                 
-                // Encode content to base64
-                const contentBase64 = btoa(JSON.stringify(content, null, 2));
-                
-                // Create or update file
-                await githubApiCall(
-                    `/repos/${GITHUB_CONFIG.REPO_OWNER}/${GITHUB_CONFIG.REPO_NAME}/contents/${GITHUB_CONFIG.DATA_FILE}`,
-                    'PUT',
-                    {
-                        message: `Update money tracker data (${transactions.length} transactions)`,
-                        content: contentBase64,
-                        sha: sha
-                    }
+                const exists = transactions.some(t => 
+                    t.date === transaction.date && 
+                    t.time === transaction.time && 
+                    t.category === transaction.category && 
+                    t.cost === transaction.cost
                 );
                 
-                authStatus.textContent = 'Connected to GitHub';
-                authStatus.className = 'auth-status authenticated';
-            } catch (error) {
-                console.error('Error saving to GitHub:', error);
-                authStatus.textContent = 'Error saving data to GitHub';
-                authStatus.className = 'auth-status not-authenticated';
-            }
-        }
-
-        // Format currency in IDR
-        function formatCurrency(amount) {
-            return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
-            }).format(amount);
-        }
-
-        // Get month name from date string
-        function getMonthName(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-        }
-
-        // Group transactions by month
-        function groupTransactionsByMonth() {
-            const grouped = {};
-            
-            transactions.forEach(transaction => {
-                const monthKey = getMonthName(transaction.date);
-                
-                if (!grouped[monthKey]) {
-                    grouped[monthKey] = [];
+                if (!exists) {
+                    importedTransactions.push(transaction);
                 }
-                
-                grouped[monthKey].push(transaction);
-            });
-            
-            return grouped;
-        }
-
-        // Update summary cards
-        function updateSummary() {
-            const totalIncome = transactions
-                .filter(t => t.type === 'In')
-                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-                
-            const totalExpenses = transactions
-                .filter(t => t.type === 'Out')
-                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-                
-            const balance = totalIncome - totalExpenses;
-            
-            currentBalanceEl.textContent = formatCurrency(balance);
-            totalIncomeEl.textContent = formatCurrency(totalIncome);
-            totalExpensesEl.textContent = formatCurrency(totalExpenses);
-        }
-
-        // Render transactions grouped by month
-        function renderTransactions() {
-            if (transactions.length === 0) {
-                noDataMessage.classList.remove('hidden');
-                transactionList.innerHTML = '';
-                return;
             }
             
-            noDataMessage.classList.add('hidden');
-            
-            const groupedTransactions = groupTransactionsByMonth();
-            let html = '';
-            
-            // Sort months in descending order (newest first)
-            const sortedMonths = Object.keys(groupedTransactions).sort((a, b) => {
-                return new Date(b) - new Date(a);
-            });
-            
-            sortedMonths.forEach(month => {
-                const monthTransactions = groupedTransactions[month];
-                
-                // Calculate monthly totals
-                const monthIncome = monthTransactions
-                    .filter(t => t.type === 'In')
-                    .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-                    
-                const monthExpenses = monthTransactions
-                    .filter(t => t.type === 'Out')
-                    .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-                    
-                const monthBalance = monthIncome - monthExpenses;
-                
-                html += `
-                <div class="month-section">
-                    <div class="month-header">${month}</div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Category</th>
-                                <th>Description</th>
-                                <th>Type</th>
-                                <th>Amount (IDR)</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${monthTransactions.map((transaction, index) => {
-                                const globalIndex = transactions.findIndex(t => 
-                                    t.date === transaction.date && 
-                                    t.time === transaction.time && 
-                                    t.category === transaction.category && 
-                                    t.cost === transaction.cost
-                                );
-                                
-                                return `
-                                <tr>
-                                    <td>${transaction.date}</td>
-                                    <td>${transaction.time}</td>
-                                    <td>${transaction.category}</td>
-                                    <td>${transaction.description || '-'}</td>
-                                    <td class="${transaction.type === 'In' ? 'type-in' : 'type-out'}">${transaction.type}</td>
-                                    <td>${formatCurrency(parseFloat(transaction.cost))}</td>
-                                    <td class="actions">
-                                        <button class="btn btn-danger btn-sm" onclick="deleteTransaction(${globalIndex})">Delete</button>
-                                    </td>
-                                </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                    <div class="month-summary">
-                        <div class="month-income">Income: ${formatCurrency(monthIncome)}</div>
-                        <div class="month-expense">Expenses: ${formatCurrency(monthExpenses)}</div>
-                        <div class="month-balance">Balance: ${formatCurrency(monthBalance)}</div>
-                    </div>
-                </div>
-                `;
-            });
-            
-            transactionList.innerHTML = html;
-        }
-
-        // Add new transaction
-        async function addTransaction(event) {
-            event.preventDefault();
-            
-            const date = document.getElementById('date').value;
-            const time = document.getElementById('time').value;
-            const category = document.getElementById('category').value;
-            const description = document.getElementById('description').value;
-            const type = document.getElementById('type').value;
-            const cost = document.getElementById('cost').value;
-            
-            const transaction = {
-                date,
-                time,
-                category,
-                description,
-                type,
-                cost: parseFloat(cost)
-            };
-            
-            transactions.push(transaction);
-            
-            // Save to GitHub if authenticated, otherwise use localStorage as fallback
-            if (isAuthenticated) {
+            if (importedTransactions.length > 0) {
+                transactions = [...transactions, ...importedTransactions];
                 await saveTransactionsToGitHub();
+                renderTransactions();
+                updateSummary();
+                alert(`Successfully imported ${importedTransactions.length} new transactions`);
             } else {
-                localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
+                alert('No new transactions found to import');
             }
             
-            renderTransactions();
-            updateSummary();
-            
-            // Reset form
-            transactionForm.reset();
-            document.getElementById('date').valueAsDate = new Date();
-            document.getElementById('time').value = new Date().toTimeString().slice(0, 5);
-        }
-
-        // Delete transaction
-        async function deleteTransaction(index) {
-            if (confirm('Are you sure you want to delete this transaction?')) {
-                transactions.splice(index, 1);
-                
-                // Save to GitHub if authenticated, otherwise use localStorage as fallback
-                if (isAuthenticated) {
-                    await saveTransactionsToGitHub();
-                } else {
-                    localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
-                }
-                
-                renderTransactions();
-                updateSummary();
-            }
-        }
-
-        // Export to CSV format
-        function exportToExcel() {
-            if (transactions.length === 0) {
-                alert('No data to export');
-                return;
-            }
-            
-            let csvContent = "Date,Time,Category,Description,Type,Cost\n";
-            
-            transactions.forEach(transaction => {
-                csvContent += `"${transaction.date}","${transaction.time}","${transaction.category}","${transaction.description || ''}","${transaction.type}",${transaction.cost}\n`;
-            });
-            
-            // Add summary
-            const totalIncome = transactions
-                .filter(t => t.type === 'In')
-                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-                
-            const totalExpenses = transactions
-                .filter(t => t.type === 'Out')
-                .reduce((sum, t) => sum + parseFloat(t.cost), 0);
-                
-            const balance = totalIncome - totalExpenses;
-            
-            csvContent += `\nTOTAL (in a month),,,,,\n`;
-            csvContent += `,,,,"Balance",${balance}\n`;
-            csvContent += `,,,,"Total Income",${totalIncome}\n`;
-            csvContent += `,,,,"Total Expenses",${totalExpenses}\n`;
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'money-tracker-export.csv');
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Import from CSV
-        async function importFromCSV(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const csvContent = e.target.result;
-                const lines = csvContent.split('\n');
-                const importedTransactions = [];
-                
-                // Skip header row
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!line) continue;
-                    
-                    // Handle CSV with quotes and commas
-                    const values = [];
-                    let inQuotes = false;
-                    let currentValue = '';
-                    
-                    for (let j = 0; j < line.length; j++) {
-                        const char = line[j];
-                        
-                        if (char === '"') {
-                            inQuotes = !inQuotes;
-                        } else if (char === ',' && !inQuotes) {
-                            values.push(currentValue);
-                            currentValue = '';
-                        } else {
-                            currentValue += char;
-                        }
-                    }
-                    
-                    values.push(currentValue);
-                    
-                    // Skip summary rows
-                    if (values[0].includes('TOTAL') || !values[0]) continue;
-                    
-                    // Create transaction object
-                    const transaction = {
-                        date: values[0].replace(/"/g, ''),
-                        time: values[1].replace(/"/g, ''),
-                        category: values[2].replace(/"/g, ''),
-                        description: values[3].replace(/"/g, ''),
-                        type: values[4].replace(/"/g, ''),
-                        cost: parseFloat(values[5].replace(/"/g, ''))
-                    };
-                    
-                    // Check if transaction already exists
-                    const exists = transactions.some(t => 
-                        t.date === transaction.date && 
-                        t.time === transaction.time && 
-                        t.category === transaction.category && 
-                        t.cost === transaction.cost
-                    );
-                    
-                    if (!exists) {
-                        importedTransactions.push(transaction);
-                    }
-                }
-                
-                if (importedTransactions.length > 0) {
-                    // Add imported transactions to existing ones
-                    transactions = [...transactions, ...importedTransactions];
-                    
-                    // Save to GitHub if authenticated, otherwise use localStorage as fallback
-                    if (isAuthenticated) {
-                        await saveTransactionsToGitHub();
-                    } else {
-                        localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
-                    }
-                    
-                    renderTransactions();
-                    updateSummary();
-                    alert(`Successfully imported ${importedTransactions.length} new transactions`);
-                } else {
-                    alert('No new transactions found to import');
-                }
-                
-                // Reset file input
-                event.target.value = '';
-            };
-            
-            reader.readAsText(file);
-        }
-
-        // Clear all data
-        async function clearAllData() {
-            if (confirm('Are you sure you want to delete all transactions? This action cannot be undone.')) {
-                transactions = [];
-                
-                // Save to GitHub if authenticated, otherwise use localStorage as fallback
-                if (isAuthenticated) {
-                    await saveTransactionsToGitHub();
-                } else {
-                    localStorage.removeItem('moneyTrackerTransactions');
-                }
-                
-                renderTransactions();
-                updateSummary();
-            }
-        }
-
-        // Event listeners
-        transactionForm.addEventListener('submit', addTransaction);
-        exportBtn.addEventListener('click', exportToExcel);
-        importFile.addEventListener('change', importFromCSV);
-        clearBtn.addEventListener('click', clearAllData);
-        githubAuthBtn.addEventListener('click', authenticateWithGitHub);
-
-        // Initialize
-        checkAuthentication();
+            event.target.value = '';
+        };
         
-        // If not authenticated with GitHub, try to load from localStorage
-        if (!isAuthenticated) {
-            transactions = JSON.parse(localStorage.getItem('moneyTrackerTransactions')) || [];
+        reader.readAsText(file);
+    }
+
+    // Clear all data
+    async function clearAllData() {
+        if (confirm('Are you sure you want to delete all transactions? This action cannot be undone.')) {
+            transactions = [];
+            await saveTransactionsToGitHub();
             renderTransactions();
             updateSummary();
         }
-    </script>
+    }
+
+    // Event listeners
+    transactionForm.addEventListener('submit', addTransaction);
+    exportBtn.addEventListener('click', exportToExcel);
+    importFile.addEventListener('change', importFromCSV);
+    clearBtn.addEventListener('click', clearAllData);
+    githubAuthBtn.addEventListener('click', authenticateWithGitHub);
+
+    // Initialize
+    loadToken();
+    
+    // Load any local transactions if not authenticated
+    if (!isAuthenticated) {
+        transactions = JSON.parse(localStorage.getItem('moneyTrackerTransactions')) || [];
+        renderTransactions();
+        updateSummary();
+    }
+
+    // Add disconnect button
+    const disconnectBtn = document.createElement('button');
+    disconnectBtn.textContent = 'Disconnect';
+    disconnectBtn.className = 'btn btn-danger';
+    disconnectBtn.style.marginLeft = '10px';
+    disconnectBtn.onclick = function() {
+        if (confirm('Disconnect from GitHub? Your token will be removed from this browser.')) {
+            localStorage.removeItem('githubToken');
+            localStorage.removeItem('moneyTrackerTransactions');
+            githubToken = null;
+            isAuthenticated = false;
+            transactions = [];
+            loadToken();
+            renderTransactions();
+            updateSummary();
+            alert('Disconnected! Token removed from browser.');
+        }
+    };
+    githubAuthBtn.parentNode.appendChild(disconnectBtn);
+</script>
 </body>
 </html>
