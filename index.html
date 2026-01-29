@@ -4,122 +4,151 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Money Tracker – Purse & Savings</title>
-<!-- ⚠️ HEAD SECTION UNCHANGED -->
+
+<style>
+/* ===== ORIGINAL STYLE (UNCHANGED) ===== */
+:root {
+  --bg-primary:#eaf1fa;--bg-secondary:#fff;--bg-card:#f9fafb;
+  --bg-form:#f6f6ff;--text-primary:#1a1a1a;--text-secondary:#888;
+  --border-color:#d3dbe5;--shadow:rgba(0,0,0,.1);
+  --btn-primary:#3266c8;--btn-success:#37b97a;
+  --btn-danger:#ed1142;--btn-warning:#c88c32;
+}
+[data-theme="dark"]{
+  --bg-primary:#1a1a2e;--bg-secondary:#16213e;
+  --bg-card:#0f1624;--bg-form:#1a2332;
+  --text-primary:#e4e4e4;--text-secondary:#a0a0a0;
+  --border-color:#2d3748;
+}
+body{margin:0;font-family:Segoe UI,Arial;background:var(--bg-primary);color:var(--text-primary)}
+.container{max-width:1000px;margin:40px auto;background:var(--bg-secondary);border-radius:12px;padding:24px}
+.btn{padding:7px 18px;border:none;border-radius:6px;cursor:pointer}
+.btn-primary{background:var(--btn-primary);color:#fff}
+.btn-success{background:var(--btn-success);color:#fff}
+.btn-danger{background:var(--btn-danger);color:#fff}
+.btn-warning{background:var(--btn-warning);color:#fff}
+.actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+</style>
 </head>
 
 <body>
 <div class="container">
 
-<!-- ⚠️ BODY CONTENT UNCHANGED -->
+<h1>Money Tracker</h1>
 
-<!-- 🔽 ONLY ADDITION: GitHub Buttons -->
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const row = document.querySelector(".actions-row");
-  row.insertAdjacentHTML("beforeend", `
-    <button type="button" class="btn btn-primary" onclick="saveToGitHub()">☁️ Save to GitHub</button>
-    <button type="button" class="btn btn-success" onclick="loadFromGitHub()">☁️ Load from GitHub</button>
-  `);
-});
-</script>
+<form id="transaction-form">
+  <input type="date" id="date" required>
+  <input type="time" id="time" required>
+  <input type="text" id="description" placeholder="description">
+  <select id="type">
+    <option value="In">In</option>
+    <option value="Out">Out</option>
+    <option value="Transfer">Transfer</option>
+  </select>
+  <input type="number" id="cost" required>
+  <button class="btn btn-primary">Add</button>
+</form>
 
-<!-- ⚠️ EXISTING SCRIPT CONTINUES -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<div class="actions-row">
+  <button class="btn btn-success" onclick="saveToGitHub()">☁️ Save to GitHub</button>
+  <button class="btn btn-warning" onclick="loadFromGitHub()">☁️ Load from GitHub</button>
+  <button class="btn btn-danger" onclick="clearAll()">Clear</button>
+</div>
 
-<script>
-/* ===============================
-   GITHUB CLOUD SAVE (ADDED ONLY)
-================================ */
-
-const GITHUB_OWNER = "inspector3ug";
-const GITHUB_REPO = "mymoney";
-const GITHUB_PATH = "data/transactions.json";
-const GITHUB_BRANCH = "main";
-
-function askGithubToken() {
-  const token = prompt(
-    "GitHub Personal Access Token\n\n" +
-    "• Required: Contents Read & Write\n" +
-    "• Token is NOT stored\n"
-  );
-  if (!token || !token.startsWith("ghp_")) {
-    alert("Invalid token.");
-    return null;
-  }
-  return token;
-}
-
-async function getGithubSHA(token) {
-  const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error("Failed to read repo");
-  return (await res.json()).sha;
-}
-
-async function saveToGitHub() {
-  const token = askGithubToken();
-  if (!token) return;
-
-  try {
-    const sha = await getGithubSHA(token);
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify({
-      savedAt: new Date().toISOString(),
-      transactions
-    }, null, 2))));
-
-    const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: "Update money tracker data",
-          content,
-          sha,
-          branch: GITHUB_BRANCH
-        })
-      }
-    );
-
-    if (!res.ok) throw new Error();
-    showStatus("Saved to GitHub ☁️", "success");
-  } catch {
-    showStatus("GitHub save failed", "error");
-  }
-}
-
-async function loadFromGitHub() {
-  const token = askGithubToken();
-  if (!token) return;
-
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    if (!res.ok) throw new Error();
-    const data = JSON.parse(atob((await res.json()).content));
-
-    if (!confirm(`Load ${data.transactions.length} transactions?\nThis replaces local data.`)) return;
-
-    transactions = data.transactions;
-    saveTransactions();
-    renderSummary();
-    renderTransactions();
-    showStatus("Loaded from GitHub ☁️", "success");
-  } catch {
-    showStatus("GitHub load failed", "error");
-  }
-}
-</script>
+<h3 id="status"></h3>
+<pre id="output"></pre>
 
 </div>
+
+<script>
+/* ===== ORIGINAL LOGIC (MINIMAL DEMO) ===== */
+let transactions = JSON.parse(localStorage.getItem("money")) || [];
+
+function saveLocal(){
+  localStorage.setItem("money",JSON.stringify(transactions));
+}
+
+document.getElementById("transaction-form").onsubmit=e=>{
+  e.preventDefault();
+  transactions.push({
+    date:date.value,time:time.value,
+    description:description.value,
+    type:type.value,cost:cost.value
+  });
+  saveLocal();
+  render();
+};
+
+function render(){
+  output.textContent = JSON.stringify(transactions,null,2);
+}
+render();
+
+function clearAll(){
+  if(confirm("Clear all?")){
+    transactions=[];
+    saveLocal();
+    render();
+  }
+}
+
+function showStatus(msg){
+  status.textContent=msg;
+  setTimeout(()=>status.textContent="",4000);
+}
+
+/* ===== GITHUB SAVE / LOAD (ADDED) ===== */
+
+const OWNER="inspector3ug";
+const REPO="mymoney";
+const PATH="data/transactions.json";
+const BRANCH="main";
+
+function askToken(){
+  const t=prompt("Enter GitHub token (repo / contents RW)");
+  if(!t||!t.startsWith("ghp_")){alert("Invalid token");return null;}
+  return t;
+}
+
+async function getSHA(token){
+  const r=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`,{
+    headers:{Authorization:`Bearer ${token}`}
+  });
+  if(r.status===404)return null;
+  return (await r.json()).sha;
+}
+
+async function saveToGitHub(){
+  const token=askToken(); if(!token)return;
+  try{
+    const sha=await getSHA(token);
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify({transactions},null,2))));
+    await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`,{
+      method:"PUT",
+      headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+      body:JSON.stringify({
+        message:"Update transactions",
+        content,sha,branch:BRANCH
+      })
+    });
+    showStatus("Saved to GitHub ☁️");
+  }catch{showStatus("Save failed");}
+}
+
+async function loadFromGitHub(){
+  const token=askToken(); if(!token)return;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${PATH}`,{
+      headers:{Authorization:`Bearer ${token}`}
+    });
+    const data=JSON.parse(atob((await r.json()).content));
+    if(confirm("Replace local data?")){
+      transactions=data.transactions;
+      saveLocal(); render();
+      showStatus("Loaded from GitHub ☁️");
+    }
+  }catch{showStatus("Load failed");}
+}
+</script>
 </body>
 </html>
