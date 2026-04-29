@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>PurseFlow · IDR Tracker | Category View + JSON Sync</title>
+    <title>PurseFlow · IDR Money Tracker</title>
     <style>
         * {
             margin: 0;
@@ -14,7 +14,7 @@
 
         body {
             background: #f4f8fe;
-            padding: 2rem 1.5rem;
+            padding: 1.5rem;
             color: #1a2a3f;
         }
 
@@ -23,127 +23,87 @@
             margin: 0 auto;
         }
 
-        /* header + sync bar */
         .header {
             text-align: center;
             margin-bottom: 1.5rem;
         }
         .header h1 {
-            font-size: 2.2rem;
+            font-size: 2rem;
             font-weight: 700;
             background: linear-gradient(135deg, #1e6f5c, #2b7a62);
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
         }
-        .sync-bar {
-            background: #eef2fa;
-            border-radius: 60px;
-            padding: 0.6rem 1.2rem;
-            margin: 1rem 0 1.8rem;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 0.8rem;
-            align-items: center;
-        }
-        .sync-bar span {
+        .header p {
             font-size: 0.8rem;
-            color: #2c5a7a;
-        }
-        .btn-outline {
-            background: white;
-            border: 1px solid #cbdde9;
-            padding: 0.4rem 1rem;
-            border-radius: 32px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-outline:hover {
-            background: #e2eaf1;
-        }
-        .btn-warning {
-            background: #fff1f0;
-            border-color: #ffb5a8;
-            color: #bc4e2c;
-        }
-        .btn-warning:hover {
-            background: #ffe0db;
+            color: #6c86a0;
+            margin-top: 0.3rem;
         }
 
-        /* 4 category cards - clickable */
         .categories-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
         .card {
             background: white;
-            border-radius: 28px;
-            padding: 1.4rem 1.2rem;
-            box-shadow: 0 5px 14px rgba(0,0,0,0.02), 0 1px 3px rgba(0,0,0,0.05);
-            transition: all 0.2s ease;
+            border-radius: 24px;
+            padding: 1.2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
             border: 1px solid #eef2f0;
             cursor: pointer;
-            position: relative;
+            transition: all 0.2s;
         }
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 18px 28px -12px rgba(0,0,0,0.12);
-            border-color: #cbdbe0;
+        .card:active {
+            transform: scale(0.98);
         }
         .card.active-category {
             border: 2px solid #1e6f5c;
             background: #fefef9;
-            box-shadow: 0 8px 20px rgba(30,111,92,0.12);
         }
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            flex-wrap: wrap;
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.5rem;
         }
         .card-title {
             font-weight: 700;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
         }
         .balance {
-            font-size: 1.9rem;
+            font-size: 1.6rem;
             font-weight: 700;
-            margin: 0.3rem 0 0.5rem;
+            margin: 0.2rem 0;
             color: #1e3a4d;
-            letter-spacing: -0.3px;
         }
         .balance small {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 400;
             color: #6c86a0;
         }
         .card-actions {
             display: flex;
-            gap: 0.6rem;
-            margin-top: 0.4rem;
-            pointer-events: auto;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
         }
         .btn-sm {
             background: #f0f4f9;
             border: none;
-            padding: 0.4rem 1rem;
+            padding: 0.35rem 0.9rem;
             border-radius: 50px;
             font-size: 0.7rem;
             font-weight: 500;
             cursor: pointer;
-            transition: 0.15s;
+            flex: 1;
         }
-        .btn-sm:hover {
+        .btn-sm:active {
             background: #e2e8f2;
+            transform: scale(0.96);
         }
 
-        /* Filter indicator */
         .filter-badge {
             background: #e9ecef;
             border-radius: 40px;
@@ -159,38 +119,36 @@
             color: #1e6f5c;
             font-weight: 600;
             cursor: pointer;
-            margin-left: 8px;
         }
 
-        /* transaction form */
         .transaction-panel {
             background: white;
-            border-radius: 32px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
+            border-radius: 24px;
+            padding: 1.2rem;
+            margin-bottom: 1.5rem;
             border: 1px solid #eef2f0;
         }
         .form-grid {
             display: flex;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 0.8rem;
             align-items: flex-end;
         }
         .input-group {
-            flex: 1 1 140px;
-            min-width: 120px;
+            flex: 1 1 130px;
+            min-width: 110px;
         }
         .input-group label {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 600;
             color: #5a7a9a;
             display: block;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
         input, select, button {
             width: 100%;
-            padding: 0.65rem 0.9rem;
-            border-radius: 20px;
+            padding: 0.55rem 0.8rem;
+            border-radius: 16px;
             border: 1px solid #dce5ef;
             background: white;
             font-size: 0.85rem;
@@ -202,24 +160,26 @@
             font-weight: 600;
             cursor: pointer;
         }
-        .btn-primary:hover {
+        .btn-primary:active {
             background: #0f5a48;
+            transform: scale(0.97);
         }
 
-        /* history header with category filter */
         .history-header {
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
-            margin: 1rem 0 1rem;
+            margin: 1rem 0 0.8rem;
+            gap: 0.5rem;
         }
         .month-selector {
             display: flex;
             gap: 12px;
-            background: #ffffffcc;
-            padding: 0.2rem 1rem;
+            background: white;
+            padding: 0.2rem 0.8rem;
             border-radius: 48px;
+            border: 1px solid #e2e8f0;
         }
         .month-selector button {
             width: auto;
@@ -231,30 +191,31 @@
         }
         .history-table-wrapper {
             background: white;
-            border-radius: 26px;
+            border-radius: 20px;
             overflow-x: auto;
             border: 1px solid #ecf0f5;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
         }
         th {
             text-align: left;
-            padding: 1rem 1rem;
+            padding: 0.8rem 0.8rem;
             background: #fafcff;
             color: #2c4e6e;
+            font-weight: 600;
         }
         td {
-            padding: 0.8rem 1rem;
+            padding: 0.7rem 0.8rem;
             border-bottom: 1px solid #eff3f8;
         }
         .badge-cat {
             background: #eef2fa;
-            padding: 0.2rem 0.7rem;
+            padding: 0.2rem 0.6rem;
             border-radius: 40px;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 500;
             white-space: nowrap;
         }
@@ -265,112 +226,157 @@
         .delete-btn {
             background: none;
             border: none;
-            font-size: 1.1rem;
+            font-size: 1rem;
             cursor: pointer;
             color: #acbecf;
-            width: auto;
-            padding: 0 6px;
+            padding: 0 4px;
         }
-        .delete-btn:hover { color: #d9534f; }
-        .empty-row td { text-align: center; color: #8da0b2; padding: 2rem; }
+        .delete-btn:active {
+            color: #d9534f;
+        }
+        .empty-row td {
+            text-align: center;
+            color: #8da0b2;
+            padding: 1.5rem;
+        }
         .info-note {
-            background: #fef7e0;
-            border-radius: 20px;
-            padding: 0.7rem 1rem;
+            background: #e8f5e9;
+            border-radius: 16px;
+            padding: 0.6rem;
             font-size: 0.7rem;
             margin-top: 1rem;
-            color: #aa8c54;
+            color: #2e7d32;
             text-align: center;
         }
         footer {
-            margin-top: 2rem;
-            font-size: 0.7rem;
+            margin-top: 1.5rem;
+            font-size: 0.65rem;
             text-align: center;
             color: #7e95ae;
         }
-        @media (max-width: 650px) {
+        @media (max-width: 600px) {
             body { padding: 1rem; }
-            .balance { font-size: 1.5rem; }
+            .balance { font-size: 1.3rem; }
+            .card-title { font-size: 0.95rem; }
         }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>💸 PurseFlow · IDR Tracker</h1>
-        <div class="sync-bar">
-            <span>📁 <strong>transactions.json</strong> (save in same repo folder)</span>
-            <button id="exportBtn" class="btn-outline">⬇️ Export / Save JSON</button>
-            <label for="importFileInput" class="btn-outline" style="display:inline-block; cursor:pointer;">📂 Import JSON file</label>
-            <input type="file" id="importFileInput" accept=".json" style="display:none;">
-            <button id="resetAllBtn" class="btn-outline btn-warning">🗑️ Reset all data</button>
-        </div>
-        <p style="font-size:0.75rem; margin-top:6px;">✨ <strong>Click any category card</strong> → filter transactions by that category. Click again to clear filter.</p>
+        <h1>💸 PurseFlow</h1>
+        <p>IDR Money Tracker · Data saved automatically</p>
     </div>
 
-    <!-- 4 clickable categories -->
     <div class="categories-grid" id="categoriesGrid"></div>
 
-    <!-- New transaction form -->
     <div class="transaction-panel">
-        <div style="font-weight:600; margin-bottom: 12px;">➕ Record transaction (IDR)</div>
+        <div style="font-weight:600; margin-bottom: 10px;">➕ Add Transaction</div>
         <div class="form-grid">
-            <div class="input-group"><label>Category</label><select id="txnCategory">
-                <option value="cashPurse">💰 Cash Purse</option><option value="eWallet">📱 E-Wallet</option>
-                <option value="cashSavings">🏦 Cash Savings</option><option value="digitalBank">💻 Digital Bank Savings</option>
-            </select></div>
-            <div class="input-group"><label>Type</label><select id="txnType"><option value="in">➕ IN (income)</option><option value="out">➖ OUT (expense)</option></select></div>
-            <div class="input-group"><label>Description</label><input type="text" id="txnDesc" placeholder="e.g., lunch, salary" autocomplete="off"></div>
-            <div class="input-group"><label>Date</label><input type="date" id="txnDate"></div>
-            <div class="input-group"><label>Time</label><input type="time" id="txnTime" step="1"></div>
-            <div class="input-group"><label>Amount (IDR)</label><input type="number" id="txnAmount" placeholder="0" step="500" min="0"></div>
-            <div class="input-group" style="flex:0.6"><button id="addTxnBtn" class="btn-primary">+ Add</button></div>
+            <div class="input-group">
+                <label>Category</label>
+                <select id="txnCategory">
+                    <option value="cashPurse">💰 Cash Purse</option>
+                    <option value="eWallet">📱 E-Wallet</option>
+                    <option value="cashSavings">🏦 Cash Savings</option>
+                    <option value="digitalBank">💻 Digital Bank</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Type</label>
+                <select id="txnType">
+                    <option value="in">➕ IN</option>
+                    <option value="out">➖ OUT</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label>Description</label>
+                <input type="text" id="txnDesc" placeholder="e.g., Lunch" autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label>Date</label>
+                <input type="date" id="txnDate">
+            </div>
+            <div class="input-group">
+                <label>Time</label>
+                <input type="time" id="txnTime" step="1">
+            </div>
+            <div class="input-group">
+                <label>Amount (IDR)</label>
+                <input type="number" id="txnAmount" placeholder="0" step="1000" min="0">
+            </div>
+            <div class="input-group" style="flex:0.5">
+                <button id="addTxnBtn" class="btn-primary">+ Add</button>
+            </div>
         </div>
     </div>
 
-    <!-- History header with filter info -->
     <div class="history-header">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <h3>📆 Monthly history</h3>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <h3>📆 History</h3>
             <div id="activeFilterBadge" class="filter-badge" style="display: none;">
-                🔍 Filtered by: <span id="filterCategoryName"></span>
-                <button id="clearFilterBtn" class="clear-filter">✖ Clear</button>
+                🔍 <span id="filterCategoryName"></span>
+                <button id="clearFilterBtn" class="clear-filter">✖</button>
             </div>
         </div>
-        <div class="month-selector"><button id="prevMonthBtn">◀</button><span id="currentMonthDisplay" class="current-month"></span><button id="nextMonthBtn">▶</button></div>
+        <div class="month-selector">
+            <button id="prevMonthBtn">◀</button>
+            <span id="currentMonthDisplay"></span>
+            <button id="nextMonthBtn">▶</button>
+        </div>
     </div>
+    
     <div class="history-table-wrapper">
-        <table id="historyTable"><thead><tr><th>Date / Time</th><th>Category</th><th>Description</th><th>Type</th><th>Amount (IDR)</th><th></th></tr></thead>
-        <tbody id="historyBody"><tr class="empty-row"><td colspan="6">✨ No transactions yet. Add one above!<\/td><\/tr><\/tbody><\/table>
+        <table>
+            <thead>
+                <tr><th>Date/Time</th><th>Category</th><th>Description</th><th>Type</th><th>Amount</th><th></th></tr>
+            </thead>
+            <tbody id="historyBody"><tr class="empty-row"><td colspan="6">✨ No transactions yet</td></tr></tbody>
+        </table>
     </div>
+    
     <div class="info-note">
-        💾 <strong>transactions.json workflow:</strong> Place an empty or existing <code>transactions.json</code> in your GitHub repo alongside this HTML file.<br>
-        Use <strong>Export</strong> to save your data → upload to repo → others/your phone can import the same file.
+        💾 <strong>Auto-save!</strong> All data stays on your phone/computer. Refresh the page - everything is still here!
     </div>
-    <footer>🇮🇩 Indonesian Rupiah (IDR) · Click any category card to filter transactions by that category only.</footer>
+    <footer>🇮🇩 Indonesian Rupiah (IDR) · Click category card to filter · Data never leaves your device</footer>
 </div>
 
 <script>
-    // ---------- CATEGORIES ----------
+    // Categories
     const CATEGORIES = {
-        cashPurse: { name: "Cash Purse", icon: "💵", balance: 0 },
-        eWallet: { name: "E-Wallet", icon: "📲", balance: 0 },
+        cashPurse: { name: "Cash Purse", icon: "💰", balance: 0 },
+        eWallet: { name: "E-Wallet", icon: "📱", balance: 0 },
         cashSavings: { name: "Cash Savings", icon: "🏦", balance: 0 },
-        digitalBank: { name: "Digital Bank Savings", icon: "🏧", balance: 0 }
+        digitalBank: { name: "Digital Bank", icon: "💻", balance: 0 }
     };
 
-    let transactions = [];        // array of transactions
+    let transactions = [];
     let currentDisplayMonth = "";
-    let activeCategoryFilter = null;   // null = show all, else categoryKey
+    let activeCategoryFilter = null;
 
-    // Helper: format IDR
+    // Helper functions
     function formatIDR(amount) {
-        return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+        return new Intl.NumberFormat('id-ID').format(Math.round(amount));
     }
 
-    // Recompute balances from transactions
+    function saveToLocalStorage() {
+        localStorage.setItem('purseflow_transactions', JSON.stringify(transactions));
+        localStorage.setItem('purseflow_version', '1.0');
+    }
+
+    function loadFromLocalStorage() {
+        const saved = localStorage.getItem('purseflow_transactions');
+        if (saved) {
+            transactions = JSON.parse(saved);
+            return true;
+        }
+        return false;
+    }
+
     function recomputeBalances() {
-        for (let key in CATEGORIES) CATEGORIES[key].balance = 0;
+        for (let key in CATEGORIES) {
+            CATEGORIES[key].balance = 0;
+        }
         for (let t of transactions) {
             let cat = CATEGORIES[t.categoryKey];
             if (cat) {
@@ -380,7 +386,6 @@
         }
     }
 
-    // Render category cards with active highlight
     function renderCategories() {
         const grid = document.getElementById("categoriesGrid");
         if (!grid) return;
@@ -389,24 +394,23 @@
             const card = document.createElement("div");
             card.className = "card";
             if (activeCategoryFilter === key) card.classList.add("active-category");
-            card.setAttribute("data-category-key", key);
             card.innerHTML = `
-                <div class="card-header"><span class="card-title">${cat.icon} ${cat.name}</span></div>
-                <div class="balance">Rp ${formatIDR(cat.balance)} <small>IDR</small></div>
+                <div class="card-header">
+                    <span class="card-title">${cat.icon} ${cat.name}</span>
+                </div>
+                <div class="balance">Rp ${formatIDR(cat.balance)}</div>
                 <div class="card-actions">
                     <button class="btn-sm quick-in" data-cat="${key}" data-type="in">+ IN</button>
                     <button class="btn-sm quick-out" data-cat="${key}" data-type="out">- OUT</button>
                 </div>
             `;
-            // make the whole card clickable for filtering (except buttons)
             card.addEventListener("click", (e) => {
-                // avoid triggering when clicking the inner buttons (stopPropagation)
                 if (e.target.classList.contains("quick-in") || e.target.classList.contains("quick-out")) return;
                 toggleCategoryFilter(key);
             });
             grid.appendChild(card);
         }
-        // attach quick action buttons (after they exist)
+        
         document.querySelectorAll('.quick-in, .quick-out').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -419,15 +423,12 @@
 
     function toggleCategoryFilter(categoryKey) {
         if (activeCategoryFilter === categoryKey) {
-            activeCategoryFilter = null;   // clear filter
+            activeCategoryFilter = null;
         } else {
             activeCategoryFilter = categoryKey;
         }
-        // re-render cards to highlight active
         renderCategories();
-        // update filter badge UI
         updateFilterBadge();
-        // refresh history table (keeping same month)
         renderHistoryByMonth();
     }
 
@@ -452,47 +453,59 @@
     function quickAdd(categoryKey, type) {
         const desc = prompt(`Add ${type === 'in' ? 'INCOME' : 'EXPENSE'} for ${CATEGORIES[categoryKey]?.name}\nDescription:`);
         if (desc === null) return;
-        const amountRaw = prompt(`Amount (IDR, numbers only):`);
+        const amountRaw = prompt(`Amount (IDR):`);
         if (amountRaw === null) return;
         let amount = parseFloat(amountRaw.replace(/\./g, '').replace(/,/g, ''));
-        if (isNaN(amount) || amount <= 0) { alert("Invalid amount (must be > 0)"); return; }
+        if (isNaN(amount) || amount <= 0) {
+            alert("Invalid amount!");
+            return;
+        }
         const now = new Date();
         const dateStr = now.toISOString().slice(0,10);
-        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        addTransaction(categoryKey, type, desc.trim() || "quick add", dateStr, timeStr, amount);
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        addTransaction(categoryKey, type, desc.trim() || "Quick add", dateStr, timeStr, amount);
     }
 
     function addTransaction(categoryKey, type, desc, date, time, amount) {
         if (!desc) desc = "—";
-        if (isNaN(amount) || amount <= 0) { alert("Amount must be positive number."); return false; }
-        if (!date) { alert("Date required"); return false; }
-        const finalTime = time || "12:00";
-        const newId = Date.now();
+        if (isNaN(amount) || amount <= 0) {
+            alert("Amount must be > 0");
+            return false;
+        }
+        if (!date) {
+            date = new Date().toISOString().slice(0,10);
+        }
+        
         const transaction = {
-            id: newId,
+            id: Date.now(),
             categoryKey: categoryKey,
             type: type,
-            desc: desc.substring(0, 60),
+            desc: desc.substring(0, 50),
             date: date,
-            time: finalTime,
-            amount: parseFloat(amount),
-            createdAt: new Date().toISOString()
+            time: time || "12:00",
+            amount: Math.round(parseFloat(amount))
         };
+        
         transactions.push(transaction);
+        saveToLocalStorage();
         recomputeBalances();
         renderCategories();
+        
         const txnMonth = date.slice(0,7);
-        if (currentDisplayMonth === txnMonth) renderHistoryByMonth();
-        else if (!currentDisplayMonth) { currentDisplayMonth = getCurrentYearMonth(); renderHistoryByMonth(); }
-        else renderHistoryByMonth();
+        if (currentDisplayMonth === txnMonth || !currentDisplayMonth) {
+            renderHistoryByMonth();
+        }
         return true;
     }
 
-    function deleteTransactionById(id) {
-        transactions = transactions.filter(t => t.id !== id);
-        recomputeBalances();
-        renderCategories();
-        renderHistoryByMonth();
+    function deleteTransaction(id) {
+        if (confirm("Delete this transaction?")) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveToLocalStorage();
+            recomputeBalances();
+            renderCategories();
+            renderHistoryByMonth();
+        }
     }
 
     function getCurrentYearMonth() {
@@ -509,36 +522,40 @@
     }
 
     function renderHistoryByMonth() {
-        if (!currentDisplayMonth) currentDisplayMonth = getCurrentYearMonth();
-        document.getElementById("currentMonthDisplay").innerText = currentDisplayMonth.replace('-', ' / ');
+        if (!currentDisplayMonth) {
+            currentDisplayMonth = getCurrentYearMonth();
+        }
+        
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const [year, month] = currentDisplayMonth.split('-');
+        document.getElementById("currentMonthDisplay").innerHTML = `${monthNames[parseInt(month)-1]} ${year}`;
+        
         const monthTx = getTransactionsForMonth(currentDisplayMonth);
         const tbody = document.getElementById("historyBody");
-        if (!tbody) return;
+        
         if (monthTx.length === 0) {
-            let filterMsg = activeCategoryFilter ? ` for ${CATEGORIES[activeCategoryFilter]?.name}` : "";
-            tbody.innerHTML = `<tr class="empty-row"><td colspan="6">📭 No transactions${filterMsg} in ${currentDisplayMonth}. Add some!</td></tr>`;
+            let filterMsg = activeCategoryFilter ? ` (${CATEGORIES[activeCategoryFilter]?.name})` : "";
+            tbody.innerHTML = `<tr class="empty-row"><td colspan="6">📭 No transactions${filterMsg} in ${monthNames[parseInt(month)-1]} ${year}</td></tr>`;
             return;
         }
+        
         tbody.innerHTML = "";
         for (let t of monthTx) {
             const catName = CATEGORIES[t.categoryKey]?.name || t.categoryKey;
             const row = tbody.insertRow();
-            row.insertCell(0).innerText = `${t.date} · ${t.time}`;
+            row.insertCell(0).innerHTML = `${t.date}<br><small>${t.time}</small>`;
             row.insertCell(1).innerHTML = `<span class="badge-cat">${catName}</span>`;
-            row.insertCell(2).innerText = t.desc || "—";
+            row.insertCell(2).innerText = t.desc;
             const typeBadge = t.type === 'in' ? 'badge-in' : 'badge-out';
             row.insertCell(3).innerHTML = `<span class="badge-cat ${typeBadge}">${t.type === 'in' ? 'IN' : 'OUT'}</span>`;
-            const amountFormatted = `Rp ${formatIDR(t.amount)}`;
             const amountClass = t.type === 'in' ? 'amount-positive' : 'amount-negative';
             const sign = t.type === 'in' ? '+' : '-';
-            row.insertCell(4).innerHTML = `<span class="${amountClass}">${sign} ${amountFormatted}</span>`;
+            row.insertCell(4).innerHTML = `<span class="${amountClass}">${sign} Rp ${formatIDR(t.amount)}</span>`;
             const delCell = row.insertCell(5);
             const delBtn = document.createElement("button");
             delBtn.innerText = "🗑️";
             delBtn.className = "delete-btn";
-            delBtn.addEventListener("click", () => {
-                if (confirm(`Delete "${t.desc}" (${sign}${amountFormatted})?`)) deleteTransactionById(t.id);
-            });
+            delBtn.onclick = () => deleteTransaction(t.id);
             delCell.appendChild(delBtn);
         }
     }
@@ -547,68 +564,17 @@
         let [year, month] = currentDisplayMonth.split('-').map(Number);
         let newMonth = month + delta;
         let newYear = year;
-        if (newMonth < 1) { newMonth = 12; newYear--; }
-        if (newMonth > 12) { newMonth = 1; newYear++; }
+        if (newMonth < 1) {
+            newMonth = 12;
+            newYear--;
+        } else if (newMonth > 12) {
+            newMonth = 1;
+            newYear++;
+        }
         currentDisplayMonth = `${newYear}-${String(newMonth).padStart(2,'0')}`;
         renderHistoryByMonth();
     }
 
-    // ---------- JSON file handling (file based, ready for transactions.json) ----------
-    function exportToJSON() {
-        const dataStr = JSON.stringify({ transactions: transactions, version: "purseflow_v1", lastUpdated: new Date().toISOString() }, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "transactions.json";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        alert("✅ transactions.json exported! Place this file in your GitHub repo next to the HTML file.");
-    }
-
-    function importFromJSON(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const parsed = JSON.parse(e.target.result);
-                if (parsed.transactions && Array.isArray(parsed.transactions)) {
-                    transactions = parsed.transactions;
-                    // validate minimal fields
-                    transactions = transactions.filter(t => t.id && t.categoryKey && t.date && typeof t.amount === 'number');
-                    recomputeBalances();
-                    renderCategories();
-                    currentDisplayMonth = getCurrentYearMonth();
-                    // Clear active filter on import to avoid mismatch
-                    activeCategoryFilter = null;
-                    updateFilterBadge();
-                    renderHistoryByMonth();
-                    alert(`✅ Imported ${transactions.length} transactions. Don't forget to re-export after changes!`);
-                } else {
-                    throw new Error("Invalid format");
-                }
-            } catch (err) {
-                alert("❌ Invalid JSON file. Please use a valid transactions.json exported from PurseFlow.");
-            }
-        };
-        reader.readAsText(file);
-    }
-
-    function resetAllData() {
-        if (confirm("⚠️ WARNING: This will delete ALL transactions permanently. Are you sure?")) {
-            transactions = [];
-            activeCategoryFilter = null;
-            recomputeBalances();
-            renderCategories();
-            updateFilterBadge();
-            currentDisplayMonth = getCurrentYearMonth();
-            renderHistoryByMonth();
-            alert("All data cleared. You can export empty file if needed.");
-        }
-    }
-
-    // setup form submission and default date/time
     function setupForm() {
         const addBtn = document.getElementById("addTxnBtn");
         addBtn.addEventListener("click", () => {
@@ -618,62 +584,62 @@
             let date = document.getElementById("txnDate").value;
             let time = document.getElementById("txnTime").value;
             let amount = parseFloat(document.getElementById("txnAmount").value);
+            
             if (!date) {
-                const today = new Date();
-                date = today.toISOString().slice(0,10);
+                date = new Date().toISOString().slice(0,10);
                 document.getElementById("txnDate").value = date;
             }
             if (!time) {
                 const now = new Date();
-                time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                time = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
                 document.getElementById("txnTime").value = time;
             }
-            if (isNaN(amount) || amount <= 0) { alert("Masukkan jumlah IDR yang valid (>0)"); return; }
+            if (isNaN(amount) || amount <= 0) {
+                alert("Enter valid amount (>0)");
+                return;
+            }
             if (!desc.trim()) desc = "—";
+            
             addTransaction(category, type, desc, date, time, amount);
             document.getElementById("txnDesc").value = "";
             document.getElementById("txnAmount").value = "";
+            
+            // Refresh current month view if needed
+            const txnMonth = date.slice(0,7);
+            if (currentDisplayMonth === txnMonth) {
+                renderHistoryByMonth();
+            }
         });
+        
+        // Set default date/time
         const now = new Date();
-        if (!document.getElementById("txnDate").value) document.getElementById("txnDate").value = now.toISOString().slice(0,10);
-        if (!document.getElementById("txnTime").value) document.getElementById("txnTime").value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    }
-
-    function bindSyncEvents() {
-        const exportBtn = document.getElementById("exportBtn");
-        const importInput = document.getElementById("importFileInput");
-        const resetBtn = document.getElementById("resetAllBtn");
-        const clearFilterBtn = document.getElementById("clearFilterBtn");
-        exportBtn.addEventListener("click", exportToJSON);
-        resetBtn.addEventListener("click", resetAllData);
-        if (clearFilterBtn) clearFilterBtn.addEventListener("click", clearFilter);
-        if (importInput) {
-            importInput.addEventListener("change", (e) => {
-                if (e.target.files && e.target.files[0]) importFromJSON(e.target.files[0]);
-                importInput.value = '';
-            });
+        if (!document.getElementById("txnDate").value) {
+            document.getElementById("txnDate").value = now.toISOString().slice(0,10);
+        }
+        if (!document.getElementById("txnTime").value) {
+            document.getElementById("txnTime").value = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
         }
     }
 
-    // start with empty data (user can import later)
-    function startEmpty() {
-        transactions = [];
-        activeCategoryFilter = null;
+    // Initialize
+    function init() {
+        const hasData = loadFromLocalStorage();
+        if (!hasData) {
+            transactions = [];
+        }
         recomputeBalances();
         renderCategories();
-        updateFilterBadge();
+        setupForm();
         currentDisplayMonth = getCurrentYearMonth();
         renderHistoryByMonth();
-    }
-
-    function init() {
-        startEmpty();   // clean start, no demo transactions
-        bindSyncEvents();
-        setupForm();
+        
         document.getElementById("prevMonthBtn").addEventListener("click", () => changeMonth(-1));
         document.getElementById("nextMonthBtn").addEventListener("click", () => changeMonth(1));
+        document.getElementById("clearFilterBtn").addEventListener("click", clearFilter);
+        
+        console.log("✅ Ready! Data saved to localStorage - survives refresh!");
     }
-
+    
     init();
 </script>
 </body>
