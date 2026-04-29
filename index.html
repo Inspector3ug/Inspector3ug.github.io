@@ -1,1722 +1,683 @@
+Here is an HTML document that adds category filtering and works with a local `transactions.json` file for your GitHub Pages site.
+```html
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Money Tracker – Dompet & Tabungan (IDR)</title>
-  <style>
-    :root {
-      --bg-primary: #eaf1fa;
-      --bg-secondary: #ffffff;
-      --bg-card: #f9fafb;
-      --bg-form: #f6f6ff;
-      --text-primary: #1a1a1a;
-      --text-secondary: #888;
-      --border-color: #d3dbe5;
-      --shadow: rgba(0, 0, 0, 0.1);
-      --btn-primary: #3266c8;
-      --btn-success: #37b97a;
-      --btn-danger: #ed1142;
-      --btn-warning: #c88c32;
-      --table-header: #f4f7fb;
-      --month-header: #3266c8;
-      --modal-overlay: rgba(0, 0, 0, 0.5);
-    }
-    [data-theme="dark"] {
-      --bg-primary: #1a1a2e;
-      --bg-secondary: #16213e;
-      --bg-card: #0f1624;
-      --bg-form: #1a2332;
-      --text-primary: #e4e4e4;
-      --text-secondary: #a0a0a0;
-      --border-color: #2d3748;
-      --shadow: rgba(0, 0, 0, 0.3);
-      --table-header: #1a2332;
-      --month-header: #2563eb;
-      --modal-overlay: rgba(0, 0, 0, 0.7);
-    }
-    * {
-      box-sizing: border-box;
-      transition: background-color 0.3s ease, color 0.3s ease;
-    }
-    body {
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      font-family: 'Segoe UI', Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 40px auto;
-      background: var(--bg-secondary);
-      border-radius: 12px;
-      box-shadow: 0 0 20px var(--shadow);
-      padding: 24px;
-    }
-    header {
-      text-align: center;
-      margin-bottom: 18px;
-      position: relative;
-    }
-    .theme-toggle {
-      position: absolute;
-      top: 0;
-      right: 0;
-      background: var(--btn-primary);
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 0.9em;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .theme-toggle:hover {
-      opacity: 0.9;
-    }
-    .sidebar-toggle {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin: 10px 0 24px 0;
-    }
-    .sidebar-toggle button {
-      padding: 9px 24px;
-      border-radius: 20px;
-      border: none;
-      background: #ddd;
-      color: var(--text-primary);
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .sidebar-toggle .active {
-      background: var(--btn-primary);
-      color: white;
-      font-weight: bold;
-    }
-    .summary-cards {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 26px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    .card {
-      flex: 1;
-      min-width: 190px;
-      background: var(--bg-card);
-      border-radius: 7px;
-      box-shadow: 0 2px 6px var(--shadow);
-      text-align: center;
-      padding: 12px 8px;
-      margin: 0 2px;
-    }
-    .card h3 {
-      font-size: 1em;
-      margin: 0 0 5px 0;
-    }
-    .amount {
-      font-size: 1.4em;
-      font-weight: bold;
-    }
-    .form-section {
-      background: var(--bg-form);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 22px;
-    }
-    .form-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .form-group {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-width: 150px;
-    }
-    label {
-      font-weight: 500;
-      margin-bottom: 3px;
-    }
-    input, select {
-      padding: 7px 9px;
-      border-radius: 4px;
-      border: 1px solid var(--border-color);
-      background: var(--bg-secondary);
-      color: var(--text-primary);
-    }
-    .actions-row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-top: 10px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      padding: 7px 19px;
-      border-radius: 5px;
-      border: none;
-      cursor: pointer;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-    .btn:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-    .btn-primary {
-      background: var(--btn-primary);
-      color: #fff;
-    }
-    .btn-success {
-      background: var(--btn-success);
-      color: #fff;
-    }
-    .btn-danger {
-      background: var(--btn-danger);
-      color: #fff;
-    }
-    .btn-warning {
-      background: var(--btn-warning);
-      color: #fff;
-    }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 14px 0;
-    }
-    th, td {
-      padding: 7px 8px;
-      border-bottom: 1px solid var(--border-color);
-    }
-    th {
-      background: var(--table-header);
-    }
-    .type-in {
-      color: var(--btn-success);
-    }
-    .type-out {
-      color: var(--btn-danger);
-    }
-    .type-transfer {
-      color: var(--btn-warning);
-    }
-    .month-section {
-      margin-bottom: 36px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    .month-header {
-      background: var(--month-header);
-      color: #fff;
-      padding: 7px 18px;
-      font-weight: 600;
-    }
-    .month-summary {
-      background: var(--bg-card);
-      padding: 7px 12px;
-      display: flex;
-      gap: 18px;
-      border-top: 1px solid var(--border-color);
-      flex-wrap: wrap;
-    }
-    .export-row {
-      margin: 18px 0;
-      text-align: center;
-      color: var(--btn-success);
-      font-weight: 500;
-    }
-    footer {
-      text-align: center;
-      color: var(--text-secondary);
-      font-size: 0.88em;
-      margin-top: 35px;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: var(--modal-overlay);
-      animation: fadeIn 0.3s;
-    }
-    .modal.active {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-content {
-      background: var(--bg-secondary);
-      padding: 30px;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 600px;
-      max-height: 90vh;
-      overflow-y: auto;
-      animation: slideIn 0.3s;
-      box-shadow: 0 4px 20px var(--shadow);
-    }
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .modal-header h2 {
-      margin: 0;
-    }
-    .close-btn {
-      background: none;
-      border: none;
-      font-size: 28px;
-      cursor: pointer;
-      color: var(--text-primary);
-      padding: 0;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .close-btn:hover {
-      opacity: 0.7;
-    }
-    .format-options {
-      display: flex;
-      gap: 12px;
-      margin: 20px 0;
-      flex-wrap: wrap;
-    }
-    .format-btn {
-      flex: 1;
-      min-width: 100px;
-      padding: 12px 20px;
-      border: 2px solid var(--border-color);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .format-btn:hover {
-      border-color: var(--btn-primary);
-      transform: translateY(-2px);
-    }
-    .format-btn.selected {
-      border-color: var(--btn-primary);
-      background: var(--btn-primary);
-      color: white;
-    }
-    .filter-section {
-      margin: 20px 0;
-      padding: 15px;
-      background: var(--bg-card);
-      border-radius: 8px;
-    }
-    .filter-section h3 {
-      margin-top: 0;
-      margin-bottom: 15px;
-      font-size: 1.1em;
-    }
-    .checkbox-group {
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      margin: 10px 0;
-    }
-    .checkbox-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .checkbox-item input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-    }
-    .export-preview {
-      margin: 20px 0;
-      padding: 15px;
-      background: var(--bg-form);
-      border-radius: 8px;
-      font-size: 0.9em;
-    }
-    .export-preview strong {
-      color: var(--btn-primary);
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes slideIn {
-      from { transform: translateY(-50px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    
-    .github-modal {
-      display: none;
-      position: fixed;
-      z-index: 1001;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: var(--modal-overlay);
-      animation: fadeIn 0.3s;
-    }
-    .github-modal.active {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .github-modal-content {
-      background: var(--bg-secondary);
-      padding: 30px;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 500px;
-      animation: slideIn 0.3s;
-      box-shadow: 0 4px 20px var(--shadow);
-    }
-    .github-step {
-      display: none;
-      animation: fadeIn 0.5s;
-    }
-    .github-step.active {
-      display: block;
-    }
-    .token-input {
-      width: 100%;
-      padding: 12px;
-      margin: 15px 0;
-      border-radius: 6px;
-      border: 1px solid var(--border-color);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      font-family: monospace;
-    }
-    .token-input:focus {
-      outline: none;
-      border-color: var(--btn-primary);
-    }
-    .github-instructions {
-      background: var(--bg-card);
-      padding: 15px;
-      border-radius: 8px;
-      margin: 15px 0;
-      font-size: 0.9em;
-      line-height: 1.5;
-    }
-    .github-instructions code {
-      background: var(--bg-form);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.9em;
-    }
-    .github-instructions a {
-      color: var(--btn-primary);
-      text-decoration: none;
-    }
-    .github-instructions a:hover {
-      text-decoration: underline;
-    }
-    .github-status {
-      padding: 10px;
-      border-radius: 6px;
-      margin: 10px 0;
-      text-align: center;
-      font-weight: 500;
-    }
-    .github-status.success {
-      background: rgba(55, 185, 122, 0.2);
-      color: var(--btn-success);
-      border: 1px solid var(--btn-success);
-    }
-    .github-status.error {
-      background: rgba(237, 17, 66, 0.2);
-      color: var(--btn-danger);
-      border: 1px solid var(--btn-danger);
-    }
-    .github-status.loading {
-      background: rgba(50, 102, 200, 0.2);
-      color: var(--btn-primary);
-      border: 1px solid var(--btn-primary);
-    }
-    .sync-indicator {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: var(--btn-success);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 0.9em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      opacity: 0;
-      transform: translateY(-10px);
-      transition: all 0.3s;
-      z-index: 1000;
-      box-shadow: 0 2px 10px var(--shadow);
-    }
-    .sync-indicator.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .sync-indicator.error {
-      background: var(--btn-danger);
-    }
-    .sync-indicator .sync-spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: white;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    @media (max-width: 600px) {
-      .container { padding: 15px; margin: 20px 10px; }
-      .summary-cards { flex-direction: column; }
-      .form-row { flex-direction: column; }
-      .month-summary { flex-direction: column; }
-      .format-options { flex-direction: column; }
-      .actions-row { flex-direction: column; }
-      .actions-row .btn { width: 100%; }
-      .theme-toggle, .github-sync-btn { 
-        position: relative; 
-        margin: 10px auto;
-        display: inline-block;
-      }
-      header {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>PurseFlow · IDR Tracker | Category View + JSON Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Inter', -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif;
+        }
+
+        body {
+            background: #f4f8fe;
+            padding: 2rem 1.5rem;
+            color: #1a2a3f;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* header + sync bar */
+        .header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e6f5c, #2b7a62);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        .sync-bar {
+            background: #eef2fa;
+            border-radius: 60px;
+            padding: 0.6rem 1.2rem;
+            margin: 1rem 0 1.8rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.8rem;
+            align-items: center;
+        }
+        .sync-bar span {
+            font-size: 0.8rem;
+            color: #2c5a7a;
+        }
+        .btn-outline {
+            background: white;
+            border: 1px solid #cbdde9;
+            padding: 0.4rem 1rem;
+            border-radius: 32px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-outline:hover {
+            background: #e2eaf1;
+        }
+        .btn-warning {
+            background: #fff1f0;
+            border-color: #ffb5a8;
+            color: #bc4e2c;
+        }
+        .btn-warning:hover {
+            background: #ffe0db;
+        }
+
+        /* 4 category cards - clickable */
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: white;
+            border-radius: 28px;
+            padding: 1.4rem 1.2rem;
+            box-shadow: 0 5px 14px rgba(0,0,0,0.02), 0 1px 3px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+            border: 1px solid #eef2f0;
+            cursor: pointer;
+            position: relative;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 18px 28px -12px rgba(0,0,0,0.12);
+            border-color: #cbdbe0;
+        }
+        .card.active-category {
+            border: 2px solid #1e6f5c;
+            background: #fefef9;
+            box-shadow: 0 8px 20px rgba(30,111,92,0.12);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 0.6rem;
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+        .balance {
+            font-size: 1.9rem;
+            font-weight: 700;
+            margin: 0.3rem 0 0.5rem;
+            color: #1e3a4d;
+            letter-spacing: -0.3px;
+        }
+        .balance small {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: #6c86a0;
+        }
+        .card-actions {
+            display: flex;
+            gap: 0.6rem;
+            margin-top: 0.4rem;
+            pointer-events: auto;
+        }
+        .btn-sm {
+            background: #f0f4f9;
+            border: none;
+            padding: 0.4rem 1rem;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .btn-sm:hover {
+            background: #e2e8f2;
+        }
+
+        /* Filter indicator */
+        .filter-badge {
+            background: #e9ecef;
+            border-radius: 40px;
+            padding: 0.25rem 1rem;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .clear-filter {
+            background: none;
+            border: none;
+            color: #1e6f5c;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        /* transaction form */
+        .transaction-panel {
+            background: white;
+            border-radius: 32px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #eef2f0;
+        }
+        .form-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+        .input-group {
+            flex: 1 1 140px;
+            min-width: 120px;
+        }
+        .input-group label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #5a7a9a;
+            display: block;
+            margin-bottom: 4px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 0.65rem 0.9rem;
+            border-radius: 20px;
+            border: 1px solid #dce5ef;
+            background: white;
+            font-size: 0.85rem;
+        }
+        .btn-primary {
+            background: #1e6f5c;
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background: #0f5a48;
+        }
+
+        /* history header with category filter */
+        .history-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1rem 0 1rem;
+        }
+        .month-selector {
+            display: flex;
+            gap: 12px;
+            background: #ffffffcc;
+            padding: 0.2rem 1rem;
+            border-radius: 48px;
+        }
+        .month-selector button {
+            width: auto;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            padding: 0 8px;
+            cursor: pointer;
+        }
+        .history-table-wrapper {
+            background: white;
+            border-radius: 26px;
+            overflow-x: auto;
+            border: 1px solid #ecf0f5;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        th {
+            text-align: left;
+            padding: 1rem 1rem;
+            background: #fafcff;
+            color: #2c4e6e;
+        }
+        td {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #eff3f8;
+        }
+        .badge-cat {
+            background: #eef2fa;
+            padding: 0.2rem 0.7rem;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .badge-in { background: #e0f2e9; color: #1a6e4b; }
+        .badge-out { background: #ffe8e5; color: #c24a2c; }
+        .amount-positive { color: #1f6e4a; font-weight: 600; }
+        .amount-negative { color: #bc4e2c; font-weight: 600; }
+        .delete-btn {
+            background: none;
+            border: none;
+            font-size: 1.1rem;
+            cursor: pointer;
+            color: #acbecf;
+            width: auto;
+            padding: 0 6px;
+        }
+        .delete-btn:hover { color: #d9534f; }
+        .empty-row td { text-align: center; color: #8da0b2; padding: 2rem; }
+        .info-note {
+            background: #fef7e0;
+            border-radius: 20px;
+            padding: 0.7rem 1rem;
+            font-size: 0.7rem;
+            margin-top: 1rem;
+            color: #aa8c54;
+            text-align: center;
+        }
+        footer {
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            text-align: center;
+            color: #7e95ae;
+        }
+        @media (max-width: 650px) {
+            body { padding: 1rem; }
+            .balance { font-size: 1.5rem; }
+        }
+    </style>
 </head>
 <body>
 <div class="container">
-  <header>
-    <div style="position: relative; width: 100%;">
-      <button class="theme-toggle" id="theme-toggle" style="right: 120px;">
-        <span id="theme-icon">🌙</span>
-        <span id="theme-text">Dark Mode</span>
-      </button>
-      <button class="theme-toggle" id="github-sync-btn" style="right: 0;">
-        <span>🔗</span>
-        <span>GitHub Sync</span>
-      </button>
+    <div class="header">
+        <h1>💸 PurseFlow · IDR Tracker</h1>
+        <div class="sync-bar">
+            <span>📁 <strong>transactions.json</strong> (save in same repo folder)</span>
+            <button id="exportBtn" class="btn-outline">⬇️ Export / Save JSON</button>
+            <label for="importFileInput" class="btn-outline" style="display:inline-block; cursor:pointer;">📂 Import JSON file</label>
+            <input type="file" id="importFileInput" accept=".json" style="display:none;">
+            <button id="resetAllBtn" class="btn-outline btn-warning">🗑️ Reset all data</button>
+        </div>
+        <p style="font-size:0.75rem; margin-top:6px;">✨ <strong>Click any category card</strong> → filter transactions by that category. Click again to clear filter.</p>
     </div>
-    <h1>Money Tracker - Indonesia</h1>
-    <span>Dompet & Tabungan · Rupiah (IDR)</span>
-  </header>
 
-  <div class="sync-indicator" id="sync-indicator">
-    <span class="sync-spinner"></span>
-    <span>Syncing...</span>
-  </div>
+    <!-- 4 clickable categories -->
+    <div class="categories-grid" id="categoriesGrid"></div>
 
-  <div class="sidebar-toggle">
-    <button id="togglePurse" class="active">Dompet</button>
-    <button id="toggleSavings">Tabungan</button>
-  </div>
-
-  <div class="summary-cards">
-    <div class="card balance">
-      <h3>Saldo Saat Ini</h3>
-      <div class="amount" id="current-balance">Rp 0</div>
+    <!-- New transaction form -->
+    <div class="transaction-panel">
+        <div style="font-weight:600; margin-bottom: 12px;">➕ Record transaction (IDR)</div>
+        <div class="form-grid">
+            <div class="input-group"><label>Category</label><select id="txnCategory">
+                <option value="cashPurse">💰 Cash Purse</option><option value="eWallet">📱 E-Wallet</option>
+                <option value="cashSavings">🏦 Cash Savings</option><option value="digitalBank">💻 Digital Bank Savings</option>
+            </select></div>
+            <div class="input-group"><label>Type</label><select id="txnType"><option value="in">➕ IN (income)</option><option value="out">➖ OUT (expense)</option></select></div>
+            <div class="input-group"><label>Description</label><input type="text" id="txnDesc" placeholder="e.g., lunch, salary" autocomplete="off"></div>
+            <div class="input-group"><label>Date</label><input type="date" id="txnDate"></div>
+            <div class="input-group"><label>Time</label><input type="time" id="txnTime" step="1"></div>
+            <div class="input-group"><label>Amount (IDR)</label><input type="number" id="txnAmount" placeholder="0" step="500" min="0"></div>
+            <div class="input-group" style="flex:0.6"><button id="addTxnBtn" class="btn-primary">+ Add</button></div>
+        </div>
     </div>
-    <div class="card income">
-      <h3>Total Pemasukan</h3>
-      <div class="amount" id="total-income">Rp 0</div>
+
+    <!-- History header with filter info -->
+    <div class="history-header">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <h3>📆 Monthly history</h3>
+            <div id="activeFilterBadge" class="filter-badge" style="display: none;">
+                🔍 Filtered by: <span id="filterCategoryName"></span>
+                <button id="clearFilterBtn" class="clear-filter">✖ Clear</button>
+            </div>
+        </div>
+        <div class="month-selector"><button id="prevMonthBtn">◀</button><span id="currentMonthDisplay" class="current-month"></span><button id="nextMonthBtn">▶</button></div>
     </div>
-    <div class="card expense">
-      <h3>Total Pengeluaran</h3>
-      <div class="amount" id="total-expenses">Rp 0</div>
+    <div class="history-table-wrapper">
+        <table id="historyTable"><thead><tr><th>Date / Time</th><th>Category</th><th>Description</th><th>Type</th><th>Amount (IDR)</th><th></th></tr></thead>
+        <tbody id="historyBody"><tr class="empty-row"><td colspan="6">✨ No transactions yet. Add one above!<\/td><\/tr><\/tbody><\/table>
     </div>
-  </div>
-
-  <div class="form-section">
-    <h2>Tambah Transaksi</h2>
-    <form id="transaction-form">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Tanggal</label>
-          <input type="date" id="date" required />
-        </div>
-        <div class="form-group">
-          <label>Waktu</label>
-          <input type="time" id="time" required />
-        </div>
-        <div class="form-group">
-          <label>Deskripsi</label>
-          <input type="text" id="description" placeholder="opsional"/>
-        </div>
-        <div class="form-group">
-          <label>Tipe</label>
-          <select id="type" required>
-            <option value="">Pilih tipe</option>
-            <option value="In">Pemasukan (In)</option>
-            <option value="Out">Pengeluaran (Out)</option>
-            <option value="Transfer">Tarik/Transfer (Tabungan→Dompet)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Jumlah (IDR)</label>
-          <input type="number" id="cost" placeholder="contoh: 10000" min="0" step="100" required />
-        </div>
-      </div>
-      <div class="actions-row">
-        <button type="submit" class="btn btn-primary">Tambah Transaksi</button>
-        <button type="button" class="btn btn-success" id="export-btn">📊 Export Data</button>
-        <input type="file" id="import-file" accept=".csv,.json,.zip" style="display: none" />
-        <button type="button" class="btn btn-warning" id="import-btn">📂 Import Data</button>
-        <button type="button" class="btn btn-danger" id="clear-btn">Hapus Semua Data</button>
-      </div>
-      <div style="margin-top:8px; font-size:0.93em; color:var(--text-secondary);">
-        Transfer mencatat pengeluaran di Tabungan dan pemasukan di Dompet.
-      </div>
-    </form>
-  </div>
-
-  <div>
-    <h2>Riwayat Transaksi (<span id="current-account-label">Dompet</span>)</h2>
-    <div id="transaction-list"></div>
-  </div>
-
-  <div class="export-row" id="export-status"></div>
-
-  <footer>Didukung oleh GitHub · Semua transaksi disimpan secara permanen (tanpa reset bulanan)</footer>
+    <div class="info-note">
+        💾 <strong>transactions.json workflow:</strong> Place an empty or existing <code>transactions.json</code> in your GitHub repo alongside this HTML file.<br>
+        Use <strong>Export</strong> to save your data → upload to repo → others/your phone can import the same file.
+    </div>
+    <footer>🇮🇩 Indonesian Rupiah (IDR) · Click any category card to filter transactions by that category only.</footer>
 </div>
-
-<!-- Export Modal -->
-<div id="export-modal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>📊 Export Transaksi</h2>
-      <button class="close-btn" id="close-modal">&times;</button>
-    </div>
-    <div class="filter-section">
-      <h3>Format Export</h3>
-      <div class="format-options">
-        <button class="format-btn selected" data-format="csv">CSV</button>
-        <button class="format-btn" data-format="json">JSON</button>
-        <button class="format-btn" data-format="zip">ZIP (All)</button>
-      </div>
-    </div>
-    <div class="filter-section">
-      <h3>Rentang Tanggal</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Dari Tanggal</label>
-          <input type="date" id="export-from-date" />
-        </div>
-        <div class="form-group">
-          <label>Sampai Tanggal</label>
-          <input type="date" id="export-to-date" />
-        </div>
-      </div>
-    </div>
-    <div class="filter-section">
-      <h3>Tipe Transaksi</h3>
-      <div class="checkbox-group">
-        <div class="checkbox-item">
-          <input type="checkbox" id="filter-income" checked />
-          <label for="filter-income">Pemasukan</label>
-        </div>
-        <div class="checkbox-item">
-          <input type="checkbox" id="filter-expense" checked />
-          <label for="filter-expense">Pengeluaran</label>
-        </div>
-        <div class="checkbox-item">
-          <input type="checkbox" id="filter-transfer" checked />
-          <label for="filter-transfer">Transfer</label>
-        </div>
-      </div>
-    </div>
-    <div class="filter-section">
-      <h3>Akun</h3>
-      <div class="checkbox-group">
-        <div class="checkbox-item">
-          <input type="checkbox" id="filter-purse" checked />
-          <label for="filter-purse">Dompet</label>
-        </div>
-        <div class="checkbox-item">
-          <input type="checkbox" id="filter-savings" checked />
-          <label for="filter-savings">Tabungan</label>
-        </div>
-      </div>
-    </div>
-    <div class="export-preview">
-      <strong>Pratinjau:</strong> <span id="preview-count">0</span> transaksi akan diexport
-    </div>
-    <div class="actions-row" style="justify-content: center;">
-      <button class="btn btn-success" id="confirm-export-btn">Download Export</button>
-      <button class="btn btn-danger" id="cancel-export-btn">Batal</button>
-    </div>
-  </div>
-</div>
-
-<!-- Import Modal -->
-<div id="import-modal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>📂 Import Transaksi</h2>
-      <button class="close-btn" id="close-import-modal">&times;</button>
-    </div>
-    <div class="filter-section">
-      <h3>Opsi Import</h3>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Metode Import</label>
-          <select id="import-method">
-            <option value="replace">Ganti Semua Data</option>
-            <option value="merge" selected>Gabung dengan Data Ada</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Backup Sebelum Import</label>
-          <select id="backup-option">
-            <option value="yes" selected>Ya (Direkomendasikan)</option>
-            <option value="no">Tidak</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="filter-section">
-      <h3>Pilih File</h3>
-      <div style="text-align: center; margin: 20px 0;">
-        <input type="file" id="import-file-select" accept=".csv,.json,.zip" style="display: none" />
-        <button class="btn btn-warning" id="browse-import-btn">Browse Files</button>
-        <div id="import-file-name" style="margin-top: 10px; color: var(--text-secondary);">
-          Tidak ada file dipilih
-        </div>
-      </div>
-      <div class="export-preview" id="import-preview">
-        <strong>Format didukung:</strong> CSV, JSON, atau ZIP (dari export sebelumnya)
-      </div>
-    </div>
-    <div class="actions-row" style="justify-content: center;">
-      <button class="btn btn-success" id="confirm-import-btn" disabled>Import Data</button>
-      <button class="btn btn-danger" id="cancel-import-btn">Batal</button>
-    </div>
-  </div>
-</div>
-
-<!-- GitHub Sync Modal -->
-<div id="github-modal" class="github-modal">
-  <div class="github-modal-content">
-    <div class="modal-header">
-      <h2>🔗 GitHub Sync</h2>
-      <button class="close-btn" id="close-github-modal">&times;</button>
-    </div>
-    
-    <div class="github-step active" id="step1">
-      <h3>Step 1: Buat GitHub Personal Access Token</h3>
-      <div class="github-instructions">
-        <ol>
-          <li>Buka <a href="https://github.com/settings/tokens" target="_blank">GitHub Token Settings</a></li>
-          <li>Klik <strong>"Generate new token (classic)"</strong></li>
-          <li>Beri nama seperti "Money Tracker Sync"</li>
-          <li>Pilih scope: <code>repo</code> (kontrol penuh repository privat)</li>
-          <li>Klik "Generate token"</li>
-          <li><strong>Salin token segera</strong> (tidak akan muncul lagi)</li>
-        </ol>
-        <p><strong>Repository:</strong> <code>inspector3ug/mymoney</code></p>
-        <p><strong>File path:</strong> <code>transactions.json</code></p>
-      </div>
-      <div class="actions-row" style="justify-content: center; margin-top: 20px;">
-        <button class="btn btn-primary" id="next-step-btn">Next: Masukkan Token</button>
-        <button class="btn btn-danger" id="cancel-github-btn">Batal</button>
-      </div>
-    </div>
-    
-    <div class="github-step" id="step2">
-      <h3>Step 2: Masukkan GitHub Token</h3>
-      <input type="password" 
-             class="token-input" 
-             id="github-token" 
-             placeholder="ghp_token_anda_disini"
-             autocomplete="off" />
-      <div class="github-instructions">
-        <p><strong>Penting:</strong> Token hanya disimpan di local storage browser. Tidak pernah dikirim ke server lain selain API GitHub.</p>
-        <p>Klik "Save & Test" untuk verifikasi koneksi dan menyimpan token.</p>
-      </div>
-      <div id="github-status"></div>
-      <div class="actions-row" style="justify-content: center; margin-top: 20px;">
-        <button class="btn btn-success" id="save-token-btn">Save & Test Connection</button>
-        <button class="btn btn-warning" id="prev-step-btn">Kembali</button>
-      </div>
-    </div>
-    
-    <div class="github-step" id="step3">
-      <h3>Step 3: Opsi Sinkronisasi</h3>
-      <div class="filter-section">
-        <h3>Frekuensi Sinkronisasi</h3>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Auto-sync</label>
-            <select id="sync-frequency">
-              <option value="manual">Manual Only</option>
-              <option value="onchange">Setiap Ada Perubahan</option>
-              <option value="5min">Setiap 5 Menit</option>
-              <option value="30min">Setiap 30 Menit</option>
-              <option value="1hour">Setiap Jam</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <div class="filter-section">
-        <h3>Arah Sinkronisasi</h3>
-        <div class="checkbox-group">
-          <div class="checkbox-item">
-            <input type="checkbox" id="sync-upload" checked />
-            <label for="sync-upload">Upload ke GitHub (Simpan)</label>
-          </div>
-          <div class="checkbox-item">
-            <input type="checkbox" id="sync-download" checked />
-            <label for="sync-download">Download dari GitHub (Muat)</label>
-          </div>
-        </div>
-      </div>
-      <div class="github-instructions" id="sync-info">
-        <p><strong>Sinkronisasi Terakhir:</strong> <span id="last-sync-time">Tidak pernah</span></p>
-        <p><strong>Status:</strong> <span id="sync-status">Belum dikonfigurasi</span></p>
-      </div>
-      <div class="actions-row" style="justify-content: center; margin-top: 20px;">
-        <button class="btn btn-success" id="sync-now-btn">Sinkronisasi Sekarang</button>
-        <button class="btn btn-warning" id="clear-token-btn">Hapus Token</button>
-        <button class="btn btn-primary" id="close-sync-btn">Tutup</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script>
-// ==================== Money Tracker - IDR Version (No Monthly Reset) ====================
-let transactions = [];
-let currentAccount = "Purse";
-let monthFormat = { month: 'long', year: 'numeric' };
-let selectedExportFormat = 'csv';
+    // ---------- CATEGORIES ----------
+    const CATEGORIES = {
+        cashPurse: { name: "Cash Purse", icon: "💵", balance: 0 },
+        eWallet: { name: "E-Wallet", icon: "📲", balance: 0 },
+        cashSavings: { name: "Cash Savings", icon: "🏦", balance: 0 },
+        digitalBank: { name: "Digital Bank Savings", icon: "🏧", balance: 0 }
+    };
 
-// Currency setting for IDR
-const CURRENCY_CODE = 'IDR';
-const CURRENCY_LOCALE = 'id-ID';
+    let transactions = [];        // array of transactions
+    let currentDisplayMonth = "";
+    let activeCategoryFilter = null;   // null = show all, else categoryKey
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat(CURRENCY_LOCALE, { 
-    style: 'currency', 
-    currency: CURRENCY_CODE, 
-    minimumFractionDigits: 0 
-  }).format(amount);
-}
-
-// --- Theme Management ---
-function initTheme() {
-  const savedTheme = localStorage.getItem('theme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  updateThemeButton(savedTheme);
-}
-
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute('data-theme');
-  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem('theme', newTheme);
-  updateThemeButton(newTheme);
-}
-
-function updateThemeButton(theme) {
-  const icon = document.getElementById('theme-icon');
-  const text = document.getElementById('theme-text');
-  if (theme === 'dark') {
-    icon.textContent = '☀️';
-    text.textContent = 'Light Mode';
-  } else {
-    icon.textContent = '🌙';
-    text.textContent = 'Dark Mode';
-  }
-}
-
-document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-
-// --- Utility Functions ---
-function getMonthKey(date) {
-  let d = new Date(date);
-  return d.toLocaleString('en-US', monthFormat);
-}
-
-function todayLocalISO() {
-  let now = new Date();
-  let o = now.getTimezoneOffset() * 60000;
-  return (new Date(now - o)).toISOString().slice(0, 10);
-}
-
-function showStatus(message, type) {
-  const exportStatus = document.getElementById('export-status');
-  exportStatus.textContent = message;
-  exportStatus.style.color = type === 'success' ? 'var(--btn-success)' : 
-                           type === 'error' ? 'var(--btn-danger)' : 
-                           'var(--btn-warning)';
-  setTimeout(() => {
-    exportStatus.textContent = '';
-  }, 5000);
-}
-
-// --- Transaction Data Storage Logic ---
-function saveTransactions() {
-  localStorage.setItem('moneyTrackerTransactions', JSON.stringify(transactions));
-}
-
-function loadTransactions() {
-  let data = localStorage.getItem('moneyTrackerTransactions');
-  if (!data) {
-    transactions = [];
-    saveTransactions();
-  } else {
-    try {
-      transactions = JSON.parse(data);
-      if (!Array.isArray(transactions)) transactions = [];
-    } catch (e) {
-      transactions = [];
-      console.error('Error loading transactions:', e);
+    // Helper: format IDR
+    function formatIDR(amount) {
+        return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
     }
-  }
-}
 
-// --- UI Elements ---
-const transactionForm = document.getElementById('transaction-form');
-const currentBalanceEl = document.getElementById('current-balance');
-const totalIncomeEl = document.getElementById('total-income');
-const totalExpensesEl = document.getElementById('total-expenses');
-const transactionList = document.getElementById('transaction-list');
-const togglePurseBtn = document.getElementById('togglePurse');
-const toggleSavingsBtn = document.getElementById('toggleSavings');
-const currentAccountLabel = document.getElementById('current-account-label');
-const exportBtn = document.getElementById('export-btn');
-const importBtn = document.getElementById('import-btn');
-const clearBtn = document.getElementById('clear-btn');
-const importFileInput = document.getElementById('import-file');
-
-// Modal elements
-const exportModal = document.getElementById('export-modal');
-const closeModal = document.getElementById('close-modal');
-const cancelExportBtn = document.getElementById('cancel-export-btn');
-const confirmExportBtn = document.getElementById('confirm-export-btn');
-const exportPreview = document.getElementById('preview-count');
-
-const importModal = document.getElementById('import-modal');
-const closeImportModal = document.getElementById('close-import-modal');
-const cancelImportBtn = document.getElementById('cancel-import-btn');
-const confirmImportBtn = document.getElementById('confirm-import-btn');
-const importFileSelect = document.getElementById('import-file-select');
-const browseImportBtn = document.getElementById('browse-import-btn');
-const importFileName = document.getElementById('import-file-name');
-
-togglePurseBtn.onclick = () => switchAccount('Purse');
-toggleSavingsBtn.onclick = () => switchAccount('Savings');
-
-function switchAccount(acc) {
-  currentAccount = acc;
-  togglePurseBtn.classList.toggle('active', acc === 'Purse');
-  toggleSavingsBtn.classList.toggle('active', acc === 'Savings');
-  currentAccountLabel.textContent = acc === 'Purse' ? 'Dompet' : 'Tabungan';
-  renderSummary();
-  renderTransactions();
-}
-
-// --- Render Functions (No monthly reset) ---
-function renderSummary() {
-  let filtered = transactions.filter(t => t.account === currentAccount);
-  
-  let income = filtered.filter(t => 
-    t.type === "In" || (t.type === "Transfer" && currentAccount === "Purse")
-  ).reduce((a, c) => a + parseFloat(c.cost || 0), 0);
-  
-  let out = filtered.filter(t => 
-    t.type === "Out" || (t.type === "Transfer" && currentAccount === "Savings")
-  ).reduce((a, c) => a + parseFloat(c.cost || 0), 0);
-  
-  currentBalanceEl.textContent = formatCurrency(income - out);
-  totalIncomeEl.textContent = formatCurrency(income);
-  totalExpensesEl.textContent = formatCurrency(out);
-}
-
-function renderTransactions() {
-  let months = {};
-  for (let t of transactions) {
-    if (t.account !== currentAccount) continue;
-    let k = getMonthKey(t.date);
-    if (!months[k]) months[k] = [];
-    months[k].push(t);
-  }
-  
-  let sortedMonths = Object.keys(months).sort((a, b) => new Date(b) - new Date(a));
-  let html = '';
-  
-  for (let month of sortedMonths) {
-    let trs = months[month];
-    let minTypes = t => t.type === "In" || (t.type === "Transfer" && currentAccount === "Purse");
-    let moutTypes = t => t.type === "Out" || (t.type === "Transfer" && currentAccount === "Savings");
-    
-    let mincome = trs.filter(minTypes).reduce((a, c) => a + parseFloat(c.cost || 0), 0);
-    let mout = trs.filter(moutTypes).reduce((a, c) => a + parseFloat(c.cost || 0), 0);
-    let mbal = mincome - mout;
-    
-    html += `<div class="month-section">
-      <div class="month-header">${month}</div>
-      <table>
-        <thead>
-          <tr><th>Tanggal</th><th>Waktu</th><th>Deskripsi</th><th>Tipe</th><th>Jumlah</th><th>Aksi</th></tr>
-        </thead>
-        <tbody>`;
-    
-    for (let i = 0; i < trs.length; ++i) {
-      let t = trs[i];
-      let ix = transactions.indexOf(t);
-      let typeDisplay = t.type === 'In' ? 'Pemasukan' : (t.type === 'Out' ? 'Pengeluaran' : 'Transfer');
-      html += `<tr>
-        <td>${t.date}</td>
-        <td>${t.time}</td>
-        <td>${t.description || ''}</td>
-        <td class="${t.type === 'In' ? 'type-in' : t.type === 'Out' ? 'type-out' : 'type-transfer'}">${typeDisplay}</td>
-        <td>${formatCurrency(parseFloat(t.cost) || 0)}</td>
-        <td><button class="btn btn-danger" style="padding:4px 12px;font-size:.85em;" onclick="deleteTransaction(${ix})">Hapus</button></td>
-       </tr>`;
-    }
-    
-    html += `</tbody>
-      </table>
-      <div class="month-summary">
-        <span>Pemasukan: ${formatCurrency(mincome)}</span>
-        <span>Pengeluaran: ${formatCurrency(mout)}</span>
-        <span>Saldo: ${formatCurrency(mbal)}</span>
-      </div>
-    </div>`;
-  }
-  
-  if (!html) {
-    html = '<div style="text-align:center; color:var(--text-secondary); margin:30px 0;">Belum ada transaksi.</div>';
-  }
-  
-  transactionList.innerHTML = html;
-}
-
-window.deleteTransaction = function(ix) {
-  if (confirm("Hapus transaksi ini?")) {
-    transactions.splice(ix, 1);
-    saveTransactions();
-    renderSummary();
-    renderTransactions();
-    showStatus("Transaksi berhasil dihapus", "success");
-  }
-};
-
-// --- Add Transaction ---
-transactionForm.onsubmit = function(e) {
-  e.preventDefault();
-  let date = document.getElementById("date").value;
-  let time = document.getElementById("time").value;
-  let description = document.getElementById("description").value;
-  let type = document.getElementById("type").value;
-  let cost = document.getElementById("cost").value;
-  
-  if (!date || !time || !type || !cost) {
-    showStatus("Harap isi semua field yang diperlukan", "error");
-    return;
-  }
-  
-  if (type === "Transfer" && currentAccount === "Savings") {
-    transactions.push({
-      date, time, description: description || "Transfer ke Dompet",
-      type: "Transfer", cost, account: "Savings"
-    });
-    transactions.push({
-      date, time, description: description || "Diterima dari Tabungan",
-      type: "Transfer", cost, account: "Purse"
-    });
-  } else {
-    transactions.push({
-      date, time, description,
-      type, cost, account: currentAccount
-    });
-  }
-  
-  saveTransactions();
-  renderSummary();
-  renderTransactions();
-  transactionForm.reset();
-  document.getElementById("date").value = todayLocalISO();
-  document.getElementById("time").value = (new Date()).toTimeString().slice(0, 5);
-  showStatus("Transaksi berhasil ditambahkan!", "success");
-};
-
-// --- Export Modal Management ---
-exportBtn.onclick = function() {
-  exportModal.classList.add('active');
-  updateExportPreview();
-};
-
-closeModal.onclick = function() {
-  exportModal.classList.remove('active');
-};
-
-cancelExportBtn.onclick = function() {
-  exportModal.classList.remove('active');
-};
-
-window.onclick = function(event) {
-  if (event.target === exportModal) {
-    exportModal.classList.remove('active');
-  }
-  if (event.target === importModal) {
-    importModal.classList.remove('active');
-  }
-  if (event.target === githubModal) {
-    githubModal.classList.remove('active');
-  }
-};
-
-// Format selection
-document.querySelectorAll('.format-btn').forEach(btn => {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('selected'));
-    this.classList.add('selected');
-    selectedExportFormat = this.getAttribute('data-format');
-    updateExportPreview();
-  });
-});
-
-const filterInputs = [
-  'export-from-date', 'export-to-date',
-  'filter-income', 'filter-expense', 'filter-transfer',
-  'filter-purse', 'filter-savings'
-];
-
-filterInputs.forEach(id => {
-  document.getElementById(id).addEventListener('change', updateExportPreview);
-});
-
-function getFilteredTransactions() {
-  let fromDate = document.getElementById('export-from-date').value;
-  let toDate = document.getElementById('export-to-date').value;
-  let includeIncome = document.getElementById('filter-income').checked;
-  let includeExpense = document.getElementById('filter-expense').checked;
-  let includeTransfer = document.getElementById('filter-transfer').checked;
-  let includePurse = document.getElementById('filter-purse').checked;
-  let includeSavings = document.getElementById('filter-savings').checked;
-  
-  return transactions.filter(t => {
-    if (fromDate && t.date < fromDate) return false;
-    if (toDate && t.date > toDate) return false;
-    if (t.type === 'In' && !includeIncome) return false;
-    if (t.type === 'Out' && !includeExpense) return false;
-    if (t.type === 'Transfer' && !includeTransfer) return false;
-    if (t.account === 'Purse' && !includePurse) return false;
-    if (t.account === 'Savings' && !includeSavings) return false;
-    return true;
-  });
-}
-
-function updateExportPreview() {
-  let filtered = getFilteredTransactions();
-  exportPreview.textContent = filtered.length;
-}
-
-// --- Export Functions ---
-confirmExportBtn.onclick = function() {
-  let filtered = getFilteredTransactions();
-  if (filtered.length === 0) {
-    showStatus("Tidak ada transaksi untuk diexport dengan filter saat ini", "error");
-    return;
-  }
-  
-  confirmExportBtn.disabled = true;
-  confirmExportBtn.textContent = "Exporting...";
-  
-  setTimeout(() => {
-    switch (selectedExportFormat) {
-      case 'csv':
-        exportToCSV(filtered);
-        break;
-      case 'json':
-        exportToJSON(filtered);
-        break;
-      case 'zip':
-        exportToOptimizedZIP(filtered);
-        break;
-    }
-    
-    confirmExportBtn.disabled = false;
-    confirmExportBtn.textContent = "Download Export";
-    exportModal.classList.remove('active');
-  }, 300);
-};
-
-function exportToCSV(data) {
-  let csv = 'Date,Time,Description,Type,Amount,Account\n';
-  for (let t of data) {
-    csv += `"${t.date}","${t.time}","${t.description || ''}","${t.type}",${t.cost},"${t.account}"\n`;
-  }
-  downloadFile(csv, 'money_tracker_export.csv', 'text/csv');
-  showStatus("File CSV berhasil didownload!", "success");
-}
-
-function exportToJSON(data) {
-  let exportData = {
-    exportDate: new Date().toISOString(),
-    totalTransactions: data.length,
-    transactions: data,
-    accounts: {
-      Purse: data.filter(t => t.account === 'Purse').length,
-      Savings: data.filter(t => t.account === 'Savings').length
-    }
-  };
-  let json = JSON.stringify(exportData, null, 2);
-  downloadFile(json, 'money_tracker_export.json', 'application/json');
-  showStatus("File JSON berhasil didownload!", "success");
-}
-
-function exportToOptimizedZIP(data) {
-  let zip = new JSZip();
-  let csv = 'Date,Time,Description,Type,Amount,Account\n';
-  for (let t of data) {
-    csv += `"${t.date}","${t.time}","${t.description || ''}","${t.type}",${t.cost},"${t.account}"\n`;
-  }
-  zip.file('transactions.csv', csv);
-  
-  let jsonData = {
-    exportDate: new Date().toISOString(),
-    totalTransactions: data.length,
-    transactions: data
-  };
-  zip.file('transactions.json', JSON.stringify(jsonData, null, 2));
-  
-  let readme = `Money Tracker Export (IDR)
-===================
-Exported: ${new Date().toLocaleString()}
-Total Transactions: ${data.length}
-Currency: Indonesian Rupiah (IDR)
-
-Files Included:
-- transactions.csv (CSV format)
-- transactions.json (JSON format)`;
-  zip.file('README.txt', readme);
-  
-  zip.generateAsync({ type: 'blob' }).then(function(content) {
-    let a = document.createElement('a');
-    a.href = URL.createObjectURL(content);
-    a.download = 'money_tracker_export.zip';
-    a.click();
-    showStatus("File ZIP berhasil didownload!", "success");
-  });
-}
-
-function downloadFile(content, filename, type) {
-  let blob = new Blob([content], { type: type });
-  let a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  a.click();
-}
-
-// --- Import Functionality ---
-importBtn.onclick = function() {
-  importModal.classList.add('active');
-  importFileName.textContent = 'Tidak ada file dipilih';
-  confirmImportBtn.disabled = true;
-};
-
-browseImportBtn.onclick = function() {
-  importFileSelect.click();
-};
-
-importFileSelect.onchange = function(e) {
-  if (e.target.files.length > 0) {
-    const file = e.target.files[0];
-    importFileName.textContent = `${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
-    confirmImportBtn.disabled = false;
-  }
-};
-
-closeImportModal.onclick = function() {
-  importModal.classList.remove('active');
-};
-
-cancelImportBtn.onclick = function() {
-  importModal.classList.remove('active');
-};
-
-confirmImportBtn.onclick = function() {
-  const file = importFileSelect.files[0];
-  if (!file) {
-    showStatus("Pilih file terlebih dahulu", "error");
-    return;
-  }
-  
-  const importMethod = document.getElementById('import-method').value;
-  const backupOption = document.getElementById('backup-option').value;
-  
-  confirmImportBtn.disabled = true;
-  confirmImportBtn.textContent = "Importing...";
-  
-  if (backupOption === 'yes' && transactions.length > 0) {
-    const backupData = JSON.stringify({
-      backupDate: new Date().toISOString(),
-      originalCount: transactions.length,
-      transactions: transactions
-    }, null, 2);
-    const backupBlob = new Blob([backupData], { type: 'application/json' });
-    const backupUrl = URL.createObjectURL(backupBlob);
-    const backupLink = document.createElement('a');
-    backupLink.href = backupUrl;
-    backupLink.download = `money_tracker_backup_${new Date().toISOString().slice(0,10)}.json`;
-    backupLink.click();
-    setTimeout(() => URL.revokeObjectURL(backupUrl), 100);
-  }
-  
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      let importedTransactions = [];
-      const content = e.target.result;
-      
-      if (file.name.endsWith('.json')) {
-        const data = JSON.parse(content);
-        if (data.transactions && Array.isArray(data.transactions)) {
-          importedTransactions = data.transactions;
-        } else if (Array.isArray(data)) {
-          importedTransactions = data;
-        } else {
-          throw new Error("Format JSON tidak valid");
+    // Recompute balances from transactions
+    function recomputeBalances() {
+        for (let key in CATEGORIES) CATEGORIES[key].balance = 0;
+        for (let t of transactions) {
+            let cat = CATEGORIES[t.categoryKey];
+            if (cat) {
+                if (t.type === "in") cat.balance += t.amount;
+                else cat.balance -= t.amount;
+            }
         }
-      } else if (file.name.endsWith('.csv')) {
-        const lines = content.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        for (let i = 1; i < lines.length; i++) {
-          if (lines[i].trim() === '') continue;
-          const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-          if (values.length >= 5) {
-            importedTransactions.push({
-              date: values[0] || todayLocalISO(),
-              time: values[1] || '00:00',
-              description: values[2] || '',
-              type: values[3] || 'Out',
-              cost: values[4] || '0',
-              account: values[5] || 'Purse'
+    }
+
+    // Render category cards with active highlight
+    function renderCategories() {
+        const grid = document.getElementById("categoriesGrid");
+        if (!grid) return;
+        grid.innerHTML = "";
+        for (let [key, cat] of Object.entries(CATEGORIES)) {
+            const card = document.createElement("div");
+            card.className = "card";
+            if (activeCategoryFilter === key) card.classList.add("active-category");
+            card.setAttribute("data-category-key", key);
+            card.innerHTML = `
+                <div class="card-header"><span class="card-title">${cat.icon} ${cat.name}</span></div>
+                <div class="balance">Rp ${formatIDR(cat.balance)} <small>IDR</small></div>
+                <div class="card-actions">
+                    <button class="btn-sm quick-in" data-cat="${key}" data-type="in">+ IN</button>
+                    <button class="btn-sm quick-out" data-cat="${key}" data-type="out">- OUT</button>
+                </div>
+            `;
+            // make the whole card clickable for filtering (except buttons)
+            card.addEventListener("click", (e) => {
+                // avoid triggering when clicking the inner buttons (stopPropagation)
+                if (e.target.classList.contains("quick-in") || e.target.classList.contains("quick-out")) return;
+                toggleCategoryFilter(key);
             });
-          }
+            grid.appendChild(card);
         }
-      } else if (file.name.endsWith('.zip')) {
-        showStatus("Import ZIP memerlukan ekstraksi file terlebih dahulu. Gunakan CSV atau JSON.", "error");
-        confirmImportBtn.disabled = false;
-        confirmImportBtn.textContent = "Import Data";
-        return;
-      } else {
-        throw new Error("Format file tidak didukung");
-      }
-      
-      importedTransactions = importedTransactions.filter(t => 
-        t && t.date && t.type && t.cost && (t.type === 'In' || t.type === 'Out' || t.type === 'Transfer')
-      );
-      
-      if (importedTransactions.length === 0) {
-        throw new Error("Tidak ada transaksi valid dalam file");
-      }
-      
-      if (importMethod === 'replace') {
-        transactions = importedTransactions;
-      } else {
-        const existingKeys = new Set(transactions.map(t => `${t.date}-${t.time}-${t.cost}-${t.type}`));
-        const uniqueNew = importedTransactions.filter(t => 
-          !existingKeys.has(`${t.date}-${t.time}-${t.cost}-${t.type}`)
-        );
-        transactions.push(...uniqueNew);
-      }
-      
-      saveTransactions();
-      renderSummary();
-      renderTransactions();
-      showStatus(`Berhasil mengimport ${importedTransactions.length} transaksi`, "success");
-      importModal.classList.remove('active');
-      
-    } catch (error) {
-      console.error('Import error:', error);
-      showStatus(`Import gagal: ${error.message}`, "error");
-    }
-    
-    confirmImportBtn.disabled = false;
-    confirmImportBtn.textContent = "Import Data";
-  };
-  
-  reader.onerror = function() {
-    showStatus("Error membaca file", "error");
-    confirmImportBtn.disabled = false;
-    confirmImportBtn.textContent = "Import Data";
-  };
-  
-  reader.readAsText(file);
-};
-
-importFileInput.onchange = function(e) {
-  if (e.target.files.length > 0) {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (Array.isArray(imported)) {
-          transactions = imported;
-          saveTransactions();
-          renderSummary();
-          renderTransactions();
-          showStatus(`Mengimport ${imported.length} transaksi`, "success");
-        } else if (imported.transactions && Array.isArray(imported.transactions)) {
-          transactions = imported.transactions;
-          saveTransactions();
-          renderSummary();
-          renderTransactions();
-          showStatus(`Mengimport ${imported.transactions.length} transaksi`, "success");
-        }
-      } catch (error) {
-        showStatus("File import tidak valid", "error");
-      }
-    };
-    reader.readAsText(file);
-  }
-};
-
-// --- Clear All Data ---
-clearBtn.onclick = function() {
-  if (confirm('Yakin? Ini akan menghapus semua transaksi secara permanen.')) {
-    transactions = [];
-    saveTransactions();
-    renderSummary();
-    renderTransactions();
-    showStatus("Semua data berhasil dihapus", "success");
-  }
-};
-
-// ==================== GITHUB SYNC FUNCTIONS ====================
-
-const GITHUB_REPO = 'inspector3ug/mymoney';
-const GITHUB_FILE = 'transactions.json';
-const GITHUB_BRANCH = 'main';
-
-let githubToken = localStorage.getItem('githubToken') || '';
-let syncInterval = null;
-let syncDebounce = null;
-
-const githubSyncBtn = document.getElementById('github-sync-btn');
-const githubModal = document.getElementById('github-modal');
-const closeGithubModal = document.getElementById('close-github-modal');
-const cancelGithubBtn = document.getElementById('cancel-github-btn');
-const nextStepBtn = document.getElementById('next-step-btn');
-const prevStepBtn = document.getElementById('prev-step-btn');
-const saveTokenBtn = document.getElementById('save-token-btn');
-const syncNowBtn = document.getElementById('sync-now-btn');
-const clearTokenBtn = document.getElementById('clear-token-btn');
-const closeSyncBtn = document.getElementById('close-sync-btn');
-const syncIndicator = document.getElementById('sync-indicator');
-
-const steps = document.querySelectorAll('.github-step');
-let currentStep = 1;
-
-function showStep(stepNumber) {
-  steps.forEach(step => step.classList.remove('active'));
-  document.getElementById(`step${stepNumber}`).classList.add('active');
-  currentStep = stepNumber;
-}
-
-githubSyncBtn.onclick = function() {
-  if (githubToken) {
-    showStep(3);
-    updateSyncInfo();
-  } else {
-    showStep(1);
-  }
-  githubModal.classList.add('active');
-};
-
-closeGithubModal.onclick = function() { githubModal.classList.remove('active'); };
-cancelGithubBtn.onclick = function() { githubModal.classList.remove('active'); };
-closeSyncBtn.onclick = function() { githubModal.classList.remove('active'); };
-nextStepBtn.onclick = function() { showStep(2); };
-prevStepBtn.onclick = function() { showStep(1); };
-
-saveTokenBtn.onclick = async function() {
-  const token = document.getElementById('github-token').value.trim();
-  if (!token) {
-    showGitHubStatus('Masukkan token', 'error');
-    return;
-  }
-  if (!token.startsWith('ghp_')) {
-    showGitHubStatus('Token harus dimulai dengan "ghp_"', 'error');
-    return;
-  }
-  
-  showGitHubStatus('Menguji koneksi...', 'loading');
-  
-  try {
-    const testResult = await testGitHubConnection(token);
-    if (testResult.success) {
-      githubToken = token;
-      localStorage.setItem('githubToken', token);
-      loadSyncSettings();
-      showGitHubStatus('Koneksi berhasil! Token tersimpan.', 'success');
-      setTimeout(() => {
-        showStep(3);
-        updateSyncInfo();
-      }, 1500);
-    } else {
-      showGitHubStatus(`Koneksi gagal: ${testResult.error}`, 'error');
-    }
-  } catch (error) {
-    showGitHubStatus(`Error: ${error.message}`, 'error');
-  }
-};
-
-async function testGitHubConnection(token) {
-  try {
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}`, {
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
-    if (response.status === 401) return { success: false, error: 'Token tidak valid' };
-    if (response.status === 403) return { success: false, error: 'Token tidak memiliki izin yang cukup' };
-    if (response.status === 404) return { success: false, error: 'Repository tidak ditemukan' };
-    if (response.ok) return { success: true };
-    return { success: false, error: `HTTP ${response.status}` };
-  } catch (error) {
-    return { success: false, error: 'Network error' };
-  }
-}
-
-function showGitHubStatus(message, type) {
-  const statusDiv = document.getElementById('github-status');
-  statusDiv.textContent = message;
-  statusDiv.className = 'github-status';
-  if (type) statusDiv.classList.add(type);
-}
-
-function updateSyncInfo() {
-  const lastSync = localStorage.getItem('lastSyncTime');
-  document.getElementById('last-sync-time').textContent = lastSync || 'Tidak pernah';
-  const syncFrequency = localStorage.getItem('syncFrequency') || 'manual';
-  document.getElementById('sync-frequency').value = syncFrequency;
-  const syncUpload = localStorage.getItem('syncUpload') !== 'false';
-  const syncDownload = localStorage.getItem('syncDownload') !== 'false';
-  document.getElementById('sync-upload').checked = syncUpload;
-  document.getElementById('sync-download').checked = syncDownload;
-  document.getElementById('sync-status').textContent = githubToken ? 'Terkonfigurasi' : 'Belum dikonfigurasi';
-}
-
-function loadSyncSettings() {
-  const frequency = localStorage.getItem('syncFrequency') || 'manual';
-  document.getElementById('sync-frequency').value = frequency;
-  const syncUpload = localStorage.getItem('syncUpload') !== 'false';
-  const syncDownload = localStorage.getItem('syncDownload') !== 'false';
-  document.getElementById('sync-upload').checked = syncUpload;
-  document.getElementById('sync-download').checked = syncDownload;
-  setupAutoSync(frequency);
-}
-
-function saveSyncSettings() {
-  const frequency = document.getElementById('sync-frequency').value;
-  const syncUpload = document.getElementById('sync-upload').checked;
-  const syncDownload = document.getElementById('sync-download').checked;
-  localStorage.setItem('syncFrequency', frequency);
-  localStorage.setItem('syncUpload', syncUpload);
-  localStorage.setItem('syncDownload', syncDownload);
-  setupAutoSync(frequency);
-}
-
-function setupAutoSync(frequency) {
-  if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
-  let intervalMs = 0;
-  switch (frequency) {
-    case 'onchange': break;
-    case '5min': intervalMs = 5 * 60 * 1000; break;
-    case '30min': intervalMs = 30 * 60 * 1000; break;
-    case '1hour': intervalMs = 60 * 60 * 1000; break;
-  }
-  if (intervalMs > 0) {
-    syncInterval = setInterval(async () => {
-      if (githubToken) await syncWithGitHub();
-    }, intervalMs);
-  }
-}
-
-function showSyncIndicator(message, type = 'default') {
-  syncIndicator.innerHTML = type === 'loading' 
-    ? '<span class="sync-spinner"></span><span>' + message + '</span>'
-    : '<span>' + message + '</span>';
-  syncIndicator.className = 'sync-indicator';
-  syncIndicator.classList.add('show');
-  if (type === 'error') syncIndicator.classList.add('error');
-  if (type !== 'loading') setTimeout(() => syncIndicator.classList.remove('show'), 3000);
-}
-
-async function syncWithGitHub() {
-  if (!githubToken) { showSyncIndicator('Token GitHub belum dikonfigurasi', 'error'); return; }
-  const syncUpload = document.getElementById('sync-upload').checked;
-  const syncDownload = document.getElementById('sync-download').checked;
-  try {
-    showSyncIndicator('Menyinkronkan dengan GitHub...', 'loading');
-    let uploaded = false, downloaded = false;
-    if (syncUpload) uploaded = await uploadToGitHub();
-    if (syncDownload) downloaded = await downloadFromGitHub();
-    const now = new Date();
-    localStorage.setItem('lastSyncTime', now.toLocaleString());
-    document.getElementById('last-sync-time').textContent = now.toLocaleString();
-    hideSyncIndicator();
-    if (uploaded && downloaded) showSyncIndicator('Sinkronisasi selesai!', 'success');
-    else if (uploaded) showSyncIndicator('Data tersimpan ke GitHub!', 'success');
-    else if (downloaded) showSyncIndicator('Data dimuat dari GitHub!', 'success');
-  } catch (error) {
-    showSyncIndicator(`Sinkronisasi gagal: ${error.message}`, 'error');
-    console.error('Sync error:', error);
-  }
-}
-
-async function uploadToGitHub() {
-  if (!githubToken) return false;
-  try {
-    let sha = null;
-    try {
-      const fileInfo = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-        headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
-      });
-      if (fileInfo.ok) { const data = await fileInfo.json(); sha = data.sha; }
-    } catch (error) {}
-    const fileData = {
-      exportDate: new Date().toISOString(),
-      totalTransactions: transactions.length,
-      transactions: transactions,
-      metadata: { lastSync: new Date().toISOString(), app: 'Money Tracker', currency: 'IDR' }
-    };
-    const content = JSON.stringify(fileData, null, 2);
-    const encodedContent = btoa(unescape(encodeURIComponent(content)));
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${githubToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      body: JSON.stringify({ message: `Money Tracker Sync (IDR): ${new Date().toLocaleString()}`, content: encodedContent, sha: sha, branch: GITHUB_BRANCH })
-    });
-    if (!response.ok) throw new Error(`Upload gagal: ${response.status}`);
-    return true;
-  } catch (error) { console.error('Upload error:', error); throw error; }
-}
-
-async function downloadFromGitHub() {
-  if (!githubToken) return false;
-  try {
-    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
-      headers: { 'Authorization': `token ${githubToken}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (response.status === 404) return false;
-    if (!response.ok) throw new Error(`Download gagal: ${response.status}`);
-    const data = await response.json();
-    const content = decodeURIComponent(escape(atob(data.content)));
-    const imported = JSON.parse(content);
-    if (imported.transactions && Array.isArray(imported.transactions)) {
-      const existingKeys = new Set(transactions.map(t => `${t.date}-${t.time}-${t.cost}-${t.type}-${t.account}`));
-      const newTransactions = imported.transactions.filter(t => !existingKeys.has(`${t.date}-${t.time}-${t.cost}-${t.type}-${t.account}`));
-      if (newTransactions.length > 0) {
-        transactions.push(...newTransactions);
-        saveTransactions();
-        renderSummary();
-        renderTransactions();
-        showStatus(`Memuat ${newTransactions.length} transaksi baru dari GitHub`, 'success');
-      }
-    }
-    return true;
-  } catch (error) { console.error('Download error:', error); throw error; }
-}
-
-syncNowBtn.onclick = async function() { saveSyncSettings(); await syncWithGitHub(); };
-
-clearTokenBtn.onclick = function() {
-  if (confirm('Hapus token GitHub? Ini akan menghentikan sinkronisasi otomatis.')) {
-    githubToken = '';
-    localStorage.removeItem('githubToken');
-    localStorage.removeItem('lastSyncTime');
-    if (syncInterval) { clearInterval(syncInterval); syncInterval = null; }
-    showGitHubStatus('Token dihapus', 'success');
-    setTimeout(() => { showStep(1); document.getElementById('github-token').value = ''; }, 1000);
-  }
-};
-
-document.getElementById('sync-frequency').addEventListener('change', saveSyncSettings);
-document.getElementById('sync-upload').addEventListener('change', saveSyncSettings);
-document.getElementById('sync-download').addEventListener('change', saveSyncSettings);
-
-const originalSaveTransactions = saveTransactions;
-saveTransactions = function() {
-  originalSaveTransactions();
-  if (githubToken && localStorage.getItem('syncFrequency') === 'onchange') {
-    const syncUpload = document.getElementById('sync-upload').checked;
-    if (syncUpload) {
-      clearTimeout(syncDebounce);
-      syncDebounce = setTimeout(() => {
-        uploadToGitHub().then(success => {
-          if (success) localStorage.setItem('lastSyncTime', new Date().toLocaleString());
+        // attach quick action buttons (after they exist)
+        document.querySelectorAll('.quick-in, .quick-out').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const catKey = btn.getAttribute('data-cat');
+                const type = btn.getAttribute('data-type');
+                quickAdd(catKey, type);
+            });
         });
-      }, 2000);
     }
-  }
-};
 
-function hideSyncIndicator() { syncIndicator.classList.remove('show'); }
+    function toggleCategoryFilter(categoryKey) {
+        if (activeCategoryFilter === categoryKey) {
+            activeCategoryFilter = null;   // clear filter
+        } else {
+            activeCategoryFilter = categoryKey;
+        }
+        // re-render cards to highlight active
+        renderCategories();
+        // update filter badge UI
+        updateFilterBadge();
+        // refresh history table (keeping same month)
+        renderHistoryByMonth();
+    }
 
-// ==================== INITIALIZATION ====================
-document.getElementById("date").value = todayLocalISO();
-document.getElementById("time").value = (new Date()).toTimeString().slice(0, 5);
-document.getElementById('export-to-date').value = todayLocalISO();
-let nowDate = new Date();
-let firstOfMonth = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
-document.getElementById('export-from-date').value = firstOfMonth.toISOString().slice(0, 10);
+    function updateFilterBadge() {
+        const badgeDiv = document.getElementById("activeFilterBadge");
+        const filterNameSpan = document.getElementById("filterCategoryName");
+        if (activeCategoryFilter && CATEGORIES[activeCategoryFilter]) {
+            badgeDiv.style.display = "inline-flex";
+            filterNameSpan.innerText = CATEGORIES[activeCategoryFilter].name;
+        } else {
+            badgeDiv.style.display = "none";
+        }
+    }
 
-initTheme();
-loadTransactions();
-switchAccount('Purse');
+    function clearFilter() {
+        activeCategoryFilter = null;
+        renderCategories();
+        updateFilterBadge();
+        renderHistoryByMonth();
+    }
 
-document.addEventListener('DOMContentLoaded', function() {
-  githubToken = localStorage.getItem('githubToken') || '';
-  loadSyncSettings();
-  if (githubToken && localStorage.getItem('syncDownload') !== 'false') {
-    setTimeout(() => { downloadFromGitHub(); }, 1000);
-  }
-});
+    function quickAdd(categoryKey, type) {
+        const desc = prompt(`Add ${type === 'in' ? 'INCOME' : 'EXPENSE'} for ${CATEGORIES[categoryKey]?.name}\nDescription:`);
+        if (desc === null) return;
+        const amountRaw = prompt(`Amount (IDR, numbers only):`);
+        if (amountRaw === null) return;
+        let amount = parseFloat(amountRaw.replace(/\./g, '').replace(/,/g, ''));
+        if (isNaN(amount) || amount <= 0) { alert("Invalid amount (must be > 0)"); return; }
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0,10);
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        addTransaction(categoryKey, type, desc.trim() || "quick add", dateStr, timeStr, amount);
+    }
+
+    function addTransaction(categoryKey, type, desc, date, time, amount) {
+        if (!desc) desc = "—";
+        if (isNaN(amount) || amount <= 0) { alert("Amount must be positive number."); return false; }
+        if (!date) { alert("Date required"); return false; }
+        const finalTime = time || "12:00";
+        const newId = Date.now();
+        const transaction = {
+            id: newId,
+            categoryKey: categoryKey,
+            type: type,
+            desc: desc.substring(0, 60),
+            date: date,
+            time: finalTime,
+            amount: parseFloat(amount),
+            createdAt: new Date().toISOString()
+        };
+        transactions.push(transaction);
+        recomputeBalances();
+        renderCategories();
+        const txnMonth = date.slice(0,7);
+        if (currentDisplayMonth === txnMonth) renderHistoryByMonth();
+        else if (!currentDisplayMonth) { currentDisplayMonth = getCurrentYearMonth(); renderHistoryByMonth(); }
+        else renderHistoryByMonth();
+        return true;
+    }
+
+    function deleteTransactionById(id) {
+        transactions = transactions.filter(t => t.id !== id);
+        recomputeBalances();
+        renderCategories();
+        renderHistoryByMonth();
+    }
+
+    function getCurrentYearMonth() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+
+    function getTransactionsForMonth(monthYYYYMM) {
+        let filtered = transactions.filter(t => t.date.startsWith(monthYYYYMM));
+        if (activeCategoryFilter) {
+            filtered = filtered.filter(t => t.categoryKey === activeCategoryFilter);
+        }
+        return filtered.sort((a,b) => (a.date + " " + a.time).localeCompare(b.date + " " + b.time));
+    }
+
+    function renderHistoryByMonth() {
+        if (!currentDisplayMonth) currentDisplayMonth = getCurrentYearMonth();
+        document.getElementById("currentMonthDisplay").innerText = currentDisplayMonth.replace('-', ' / ');
+        const monthTx = getTransactionsForMonth(currentDisplayMonth);
+        const tbody = document.getElementById("historyBody");
+        if (!tbody) return;
+        if (monthTx.length === 0) {
+            let filterMsg = activeCategoryFilter ? ` for ${CATEGORIES[activeCategoryFilter]?.name}` : "";
+            tbody.innerHTML = `<tr class="empty-row"><td colspan="6">📭 No transactions${filterMsg} in ${currentDisplayMonth}. Add some!</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = "";
+        for (let t of monthTx) {
+            const catName = CATEGORIES[t.categoryKey]?.name || t.categoryKey;
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = `${t.date} · ${t.time}`;
+            row.insertCell(1).innerHTML = `<span class="badge-cat">${catName}</span>`;
+            row.insertCell(2).innerText = t.desc || "—";
+            const typeBadge = t.type === 'in' ? 'badge-in' : 'badge-out';
+            row.insertCell(3).innerHTML = `<span class="badge-cat ${typeBadge}">${t.type === 'in' ? 'IN' : 'OUT'}</span>`;
+            const amountFormatted = `Rp ${formatIDR(t.amount)}`;
+            const amountClass = t.type === 'in' ? 'amount-positive' : 'amount-negative';
+            const sign = t.type === 'in' ? '+' : '-';
+            row.insertCell(4).innerHTML = `<span class="${amountClass}">${sign} ${amountFormatted}</span>`;
+            const delCell = row.insertCell(5);
+            const delBtn = document.createElement("button");
+            delBtn.innerText = "🗑️";
+            delBtn.className = "delete-btn";
+            delBtn.addEventListener("click", () => {
+                if (confirm(`Delete "${t.desc}" (${sign}${amountFormatted})?`)) deleteTransactionById(t.id);
+            });
+            delCell.appendChild(delBtn);
+        }
+    }
+
+    function changeMonth(delta) {
+        let [year, month] = currentDisplayMonth.split('-').map(Number);
+        let newMonth = month + delta;
+        let newYear = year;
+        if (newMonth < 1) { newMonth = 12; newYear--; }
+        if (newMonth > 12) { newMonth = 1; newYear++; }
+        currentDisplayMonth = `${newYear}-${String(newMonth).padStart(2,'0')}`;
+        renderHistoryByMonth();
+    }
+
+    // ---------- JSON file handling (file based, ready for transactions.json) ----------
+    function exportToJSON() {
+        const dataStr = JSON.stringify({ transactions: transactions, version: "purseflow_v1", lastUpdated: new Date().toISOString() }, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "transactions.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert("✅ transactions.json exported! Place this file in your GitHub repo next to the HTML file.");
+    }
+
+    function importFromJSON(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (parsed.transactions && Array.isArray(parsed.transactions)) {
+                    transactions = parsed.transactions;
+                    // validate minimal fields
+                    transactions = transactions.filter(t => t.id && t.categoryKey && t.date && typeof t.amount === 'number');
+                    recomputeBalances();
+                    renderCategories();
+                    currentDisplayMonth = getCurrentYearMonth();
+                    // Clear active filter on import to avoid mismatch
+                    activeCategoryFilter = null;
+                    updateFilterBadge();
+                    renderHistoryByMonth();
+                    alert(`✅ Imported ${transactions.length} transactions. Don't forget to re-export after changes!`);
+                } else {
+                    throw new Error("Invalid format");
+                }
+            } catch (err) {
+                alert("❌ Invalid JSON file. Please use a valid transactions.json exported from PurseFlow.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function resetAllData() {
+        if (confirm("⚠️ WARNING: This will delete ALL transactions permanently. Are you sure?")) {
+            transactions = [];
+            activeCategoryFilter = null;
+            recomputeBalances();
+            renderCategories();
+            updateFilterBadge();
+            currentDisplayMonth = getCurrentYearMonth();
+            renderHistoryByMonth();
+            alert("All data cleared. You can export empty file if needed.");
+        }
+    }
+
+    // setup form submission and default date/time
+    function setupForm() {
+        const addBtn = document.getElementById("addTxnBtn");
+        addBtn.addEventListener("click", () => {
+            const category = document.getElementById("txnCategory").value;
+            const type = document.getElementById("txnType").value;
+            let desc = document.getElementById("txnDesc").value;
+            let date = document.getElementById("txnDate").value;
+            let time = document.getElementById("txnTime").value;
+            let amount = parseFloat(document.getElementById("txnAmount").value);
+            if (!date) {
+                const today = new Date();
+                date = today.toISOString().slice(0,10);
+                document.getElementById("txnDate").value = date;
+            }
+            if (!time) {
+                const now = new Date();
+                time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+                document.getElementById("txnTime").value = time;
+            }
+            if (isNaN(amount) || amount <= 0) { alert("Masukkan jumlah IDR yang valid (>0)"); return; }
+            if (!desc.trim()) desc = "—";
+            addTransaction(category, type, desc, date, time, amount);
+            document.getElementById("txnDesc").value = "";
+            document.getElementById("txnAmount").value = "";
+        });
+        const now = new Date();
+        if (!document.getElementById("txnDate").value) document.getElementById("txnDate").value = now.toISOString().slice(0,10);
+        if (!document.getElementById("txnTime").value) document.getElementById("txnTime").value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    }
+
+    function bindSyncEvents() {
+        const exportBtn = document.getElementById("exportBtn");
+        const importInput = document.getElementById("importFileInput");
+        const resetBtn = document.getElementById("resetAllBtn");
+        const clearFilterBtn = document.getElementById("clearFilterBtn");
+        exportBtn.addEventListener("click", exportToJSON);
+        resetBtn.addEventListener("click", resetAllData);
+        if (clearFilterBtn) clearFilterBtn.addEventListener("click", clearFilter);
+        if (importInput) {
+            importInput.addEventListener("change", (e) => {
+                if (e.target.files && e.target.files[0]) importFromJSON(e.target.files[0]);
+                importInput.value = '';
+            });
+        }
+    }
+
+    // start with empty data (user can import later)
+    function startEmpty() {
+        transactions = [];
+        activeCategoryFilter = null;
+        recomputeBalances();
+        renderCategories();
+        updateFilterBadge();
+        currentDisplayMonth = getCurrentYearMonth();
+        renderHistoryByMonth();
+    }
+
+    function init() {
+        startEmpty();   // clean start, no demo transactions
+        bindSyncEvents();
+        setupForm();
+        document.getElementById("prevMonthBtn").addEventListener("click", () => changeMonth(-1));
+        document.getElementById("nextMonthBtn").addEventListener("click", () => changeMonth(1));
+    }
+
+    init();
 </script>
 </body>
 </html>
+```
